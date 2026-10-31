@@ -674,8 +674,7 @@ class DesignAPI:
         path = os.path.expanduser(str(path))
         if not path.lower().endswith(".stickproj"):
             path += ".stickproj"
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(self.doc.to_json(with_template=True))
+        fileio.write_text_atomic(path, self.doc.to_json(with_template=True))
         self.w.path = path
         self.w.dirty = False
         self.w.update_title()

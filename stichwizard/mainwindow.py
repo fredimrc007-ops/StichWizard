@@ -4766,8 +4766,7 @@ class MainWindow(QMainWindow):
         if not self.path:
             return self.save_doc_as()
         try:
-            with open(self.path, "w", encoding="utf-8") as f:
-                f.write(self.doc.to_json(with_template=True))
+            fileio.write_text_atomic(self.path, self.doc.to_json(with_template=True))
         except OSError as e:
             QMessageBox.critical(self, APP, f"Speichern fehlgeschlagen:\n{e}")
             return False

@@ -7,6 +7,38 @@ from .engine import JUMP, STITCH, STOP, TRIM, bounds_of
 from .model import EmbObject
 from .threads import hex_to_rgb, rgb_to_hex, thread_name
 
+def write_text_atomic(path, text):
+    """Text sicher speichern: erst in eine Zwischendatei im selben Ordner, dann in einem Schritt
+    über das Original legen. Bricht das Schreiben ab (Absturz, Platte voll, Strom weg), bleibt
+    die alte Datei unversehrt und es liegt höchstens eine »….tmp«-Datei daneben."""
+    import tempfile
+    path = os.path.realpath(path)          # Verknüpfung: das Ziel ersetzen, nicht den Link
+    d = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(prefix="." + os.path.basename(path) + ".", suffix=".tmp", dir=d)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        try:                               # Rechte der alten Datei behalten (mkstemp: nur 0600)
+            os.chmod(tmp, os.stat(path).st_mode & 0o7777)
+        except FileNotFoundError:
+            os.chmod(tmp, 0o666 & ~_umask())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _umask():
+    m = os.umask(0)
+    os.umask(m)
+    return m
+
+
 EXPORT_FORMATS = [
     ("PES – Brother / Babylock / Deco", "pes"),
     ("DST – Tajima (universell)", "dst"),
