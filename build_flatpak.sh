@@ -91,7 +91,7 @@ flatpak build app python3 -m compileall -q -j 0 /app/share/stichwizard "/app/lib
 
 echo "== 5/6 Berechtigungen"
 flatpak build-finish app --command=stichwizard \
-    --share=ipc --socket=wayland --socket=fallback-x11 --device=dri \
+    --share=ipc --share=network --socket=wayland --socket=fallback-x11 --device=dri \
     --filesystem=home --filesystem=/run/media --filesystem=/media >/dev/null
 
 echo "== 6/6 Paket bauen"

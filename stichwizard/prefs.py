@@ -37,6 +37,7 @@ DEFAULTS = {
     "new_underlay": True,
     "text_font": DEFAULT_FONT,
     "mcp_enabled": True,        # KI-Schnittstelle (MCP)
+    "update_check": True,       # beim Start nach neuer Version sehen (GitHub, nur Hinweis)
     "optimize_export": True,    # Sprungstiche beim Export optimieren
     "thread_chart": "",         # gewählte Garnkarte (leer = Standardfarben)
     "tie_mode": "normal",       # Vernähen: none | normal | strong
@@ -147,6 +148,8 @@ class SettingsDialog(QDialog):
         self.optexp.setChecked(P("optimize_export"))
         self.mcp = QCheckBox("KI-Assistenten (MCP) dürfen StichWizard steuern")
         self.mcp.setChecked(P("mcp_enabled"))
+        self.updchk = QCheckBox("Beim Start nach neuen Versionen sehen (nur Hinweis)")
+        self.updchk.setChecked(P("update_check"))
         tabs.addTab(self._page([
             ("Stickmaschine", self.machine),
             ("Standard-Stickrahmen", self.hoop),
@@ -156,6 +159,7 @@ class SettingsDialog(QDialog):
             ("Rückgängig bis zu", self.undo),
             ("Export", self.optexp),
             ("KI-Schnittstelle", self.mcp),
+            ("Updates", self.updchk),
         ], "Rahmen und Stoff gelten für jedes neue Design. Die Stickgeschwindigkeit deiner "
            "Maschine wird für die geschätzte Stickzeit verwendet. Die KI-Schnittstelle ist nur "
            "für Programme deines eigenen Benutzers erreichbar; Einrichtung unter Hilfe › "
@@ -319,6 +323,7 @@ class SettingsDialog(QDialog):
         self.speed.setValue(d["speed"])
         self.undo.setValue(d["undo_steps"])
         self.mcp.setChecked(d["mcp_enabled"])
+        self.updchk.setChecked(d["update_check"])
         self.optexp.setChecked(d["optimize_export"])
         self.view_mode.setCurrentIndex(self.view_mode.findData(d["view_mode"]))
         self.grid.setChecked(d["show_grid"])
@@ -346,6 +351,7 @@ class SettingsDialog(QDialog):
         S("speed", self.speed.value())
         S("undo_steps", self.undo.value())
         S("mcp_enabled", self.mcp.isChecked())
+        S("update_check", self.updchk.isChecked())
         S("optimize_export", self.optexp.isChecked())
         S("tie_mode", self.tie.currentData())
         S("min_stitch", self.min_stitch.value())
