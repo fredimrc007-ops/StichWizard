@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBo
                                QVBoxLayout, QWidget)
 from shapely import affinity
 from shapely.geometry import Point, Polygon
-from shapely.ops import unary_union
+from shapely.ops import linemerge, unary_union
 
 from . import curves, engine, fileio, icons
 from .autodigitize import IMAGE_EXTS, DigitizeDialog, load_image
@@ -177,6 +177,11 @@ class MainWindow(QMainWindow):
         self.palette_bar.set_chart(_threads.CURRENT_CHART)
 
         self.settings = QSettings("StickStudio", "StickStudio")
+        try:
+            self.canvas.eraser_size = max(0.3, min(50.0, float(self.settings.value("eraserSize", 3.0))))
+        except (TypeError, ValueError):
+            pass
+        self.canvas.eraserSizeChanged.connect(self._eraser_size_changed)
         self.apply_hoop()
         self.commit(initial=True)
         self.update_title()
@@ -632,7 +637,7 @@ class MainWindow(QMainWindow):
                                    ("text", "Schriftzug", "text", "T"),
                                    ("nodes", "Punkte bearbeiten", "nodes", "N"),
                                    ("connect", "Zwei Punkte mit einer Linie verbinden", "connectline", "K"),
-                                   ("eraser", "Radierer (Bereich wegschneiden)", "eraser", "X"),
+                                   ("eraser", "Radierer: über Formen wischen ([ / ] = Größe)", "eraser", "X"),
                                    ("jumps", "Sprünge & Fadenschnitte bearbeiten", "jumps", "J"),
                                    ("measure", "Messen: Abstand und Winkel ziehen (Umschalt = 45°)",
                                     "measure", "M"),
@@ -898,7 +903,7 @@ class MainWindow(QMainWindow):
         # Bearbeiten: die Kontur eines einzelnen Objekts formen
         r.addTab(self._page([
             self._group("Werkzeuge", [B(self.tool_actions["nodes"]), B(self.tool_actions["connect"]),
-                                      B(self.tool_actions["eraser"])]),
+                                      self._eraser_btn()]),
             self._group("Punkte", [B(self.a_addnode), B(self.a_joinnode), B(self.a_breaknode),
                                    B(self.a_corner), B(self.a_curvept), B(self.a_auto),
                                    B(self.a_simplify)]),
@@ -1128,6 +1133,48 @@ class MainWindow(QMainWindow):
             f"<tr><td>Rahmen {w:g} × {h:g} mm</td><td><b>{'passt' if fits else 'GRÖSSER als das Stickfeld!'}</b></td></tr>"
             "</table><p><small>Angaben laut Hersteller/Händler – bitte mit dem Handbuch "
             "abgleichen.</small></p>"))
+
+    ERASER_SIZES = (0.5, 1, 2, 3, 5, 8, 12, 20)
+
+    def _eraser_btn(self):
+        """Radierer: Klick schaltet das Werkzeug ein, der Pfeil wählt Größe bzw. Lasso."""
+        b = self._rbtn(self.tool_actions["eraser"])
+        b.setPopupMode(QToolButton.MenuButtonPopup)
+        m = QMenu(self)
+        m.aboutToShow.connect(lambda: self._fill_eraser_menu(m))
+        b.setMenu(m)
+        return b
+
+    def _fill_eraser_menu(self, m):
+        m.clear()
+        cur = self.canvas.eraser_size
+        for mm in self.ERASER_SIZES:
+            a = m.addAction(f"Pinsel {mm:g} mm", lambda v=mm: self.set_eraser(v, False))
+            a.setCheckable(True)
+            a.setChecked(not self.canvas.eraser_lasso and abs(cur - mm) < 1e-6)
+        m.addSeparator()
+        a = m.addAction("Lasso: Bereich umfahren", lambda: self.set_eraser(None, True))
+        a.setCheckable(True)
+        a.setChecked(self.canvas.eraser_lasso)
+
+    def set_eraser(self, size=None, lasso=False):
+        self.canvas.eraser_lasso = bool(lasso)
+        if size is not None:
+            self.canvas.set_eraser_size(size)
+        self.set_tool("eraser")
+
+    def _eraser_size_changed(self, mm):
+        self.settings.setValue("eraserSize", mm)
+        if self.canvas.tool == "eraser":
+            self.lbl_tip.setText(self._eraser_tip())
+
+    def _eraser_tip(self):
+        if self.canvas.eraser_lasso:
+            return ("Radierer (Lasso): Bereich umfahren, der weggeschnitten werden soll · "
+                    "Pinsel-Radierer über den Pfeil am Knopf")
+        return (f"Radierer {self.canvas.eraser_size:g} mm: mit gedrückter Maustaste über die Form "
+                "wischen · [ / ] = kleiner/größer · Umschalt+Ziehen = Bereich umfahren (Lasso) · "
+                "wirkt auf die ausgewählten Formen, sonst auf alle darunter")
 
     def _sketch_btn(self):
         """Sketch: Klick schaltet das Werkzeug ein, der Pfeil wählt den Stil."""
@@ -1548,6 +1595,8 @@ class MainWindow(QMainWindow):
                            ("Säulen-Satin", k(T["satin"])),
                            ("Schriftzug", k(T["text"])), ("Punkte bearbeiten", k(T["nodes"])), ("Mit Linie verbinden", k(T["connect"])),
                            ("Radierer", k(T["eraser"])),
+                           ("Radierer kleiner / größer", "[  /  ]"),
+                           ("Radierer: Bereich umfahren (Lasso)", "Umschalt + Ziehen"),
                            ("Sprünge & Fadenschnitte bearbeiten", k(T["jumps"])),
                            ("Zurück zum Auswählen", "Esc")]),
             ("Bearbeiten", [("Rückgängig", k(self.a_undo)),
@@ -1910,8 +1959,7 @@ class MainWindow(QMainWindow):
             "jumps": "Orange = Sprung, Rot mit ✕ = Sprung mit Fadenschnitt · Klick auf einen Sprung: "
                      "Fadenschnitt setzen/entfernen oder mit Stichen verbinden · Klick auf einen Stich "
                      "einer Stickdatei: in Sprung umwandeln",
-            "eraser": "Bereich umfahren, der weggeschnitten werden soll (wirkt auf die ausgewählten "
-                      "Formen, sonst auf alle darunter)",
+            "eraser": self._eraser_tip(),
             "measure": "Messen: von Punkt zu Punkt ziehen – Abstand, waagerecht/senkrecht und Winkel "
                        "erscheinen an der Linie · Umschalt = in 45°-Schritten",
         }
@@ -4127,34 +4175,54 @@ class MainWindow(QMainWindow):
         bx, by = o.to_local(0, 1)
         return [ax - ox, bx - ox, ay - oy, by - oy, ox, oy]
 
-    def erase(self, pts):
-        cut = Polygon(pts).buffer(0)
+    def erase(self, cut):
+        """Schneidet die Fläche `cut` (Pinselstrich oder Lasso, Arbeitsfläche) aus den ausgewählten
+        Formen, sonst aus allen darunter – wie ein Radierer im Malprogramm. Durchgeschnittene
+        Linien bleiben in allen Stücken erhalten."""
+        if not hasattr(cut, "geom_type"):            # alte Aufrufer: Liste von Lasso-Punkten
+            cut = Polygon(cut).buffer(0)
+        if cut.is_empty:
+            return
         targets = [o for o in self.selected_objects() if o.kind in ("shape", "text", "line")]
         if not targets:
             targets = [o for o in self.doc.objects if o.kind in ("shape", "text", "line") and o.visible
                        and o.world_geometry() is not None and o.world_geometry().intersects(cut)]
-        changed, removed = [], []
+        changed, removed, added = [], [], []
         for o in targets:
             wg = o.world_geometry()
             if wg is None or not wg.intersects(cut):
                 continue
             if o.kind == "text":
                 self._text_to_shape(o)
-            local_cut = Polygon([o.to_local(x, y) for x, y in cut.exterior.coords]).buffer(0)
-            rest = o.raw_geometry().difference(local_cut)
+            local_cut = affinity.affine_transform(cut, self._inverse_matrix(o))
+            raw = o.raw_geometry()
+            rest = raw.difference(local_cut)
             if o.kind == "line":
-                parts = sorted(lines_of(rest), key=lambda l: -l.length)
-                if not parts or parts[0].length < 1:
+                if o.closed and rest.geom_type == "MultiLineString":
+                    rest = linemerge(rest)               # Stücke am alten Startpunkt zusammenfügen
+                parts = sorted((l for l in lines_of(rest) if l.length >= 1), key=lambda l: -l.length)
+                if not parts:
                     removed.append(o)
                     continue
-                rest = parts[0]
-            if rest.is_empty or rest.area < 0.3 and o.kind != "line":
+                if rest.length < raw.length - 1e-6:      # angeschnitten: ab jetzt offene Linie(n)
+                    o.closed = False
+                o.set_raw_geometry(parts[0])
+                changed.append(o)
+                for piece in parts[1:]:
+                    c = o.clone()
+                    c.set_raw_geometry(piece)
+                    added.append((o, c))
+                continue
+            if rest.is_empty or rest.area < 0.3:
                 removed.append(o)
                 continue
             o.set_raw_geometry(rest)
             changed.append(o)
         if not changed and not removed:
             return
+        for orig, c in added:                            # neue Stücke direkt hinter dem Original
+            i = next(k for k, x in enumerate(self.doc.objects) if x is orig)
+            self.doc.objects.insert(i + 1, c)
         if removed:
             ids = {o.id for o in removed}
             self.doc.objects = [o for o in self.doc.objects if o.id not in ids]

@@ -10,7 +10,7 @@ from shapely.geometry import LineString, Point, Polygon, box
 from . import curves
 from .curves import CORNER, CTRL, CURVE
 
-from .render import ObjectItem
+from .render import ObjectItem, geom_path
 
 ACCENT = QColor("#0FA3A3")         # Akzentfarbe – vom Hauptfenster je nach Farbschema gesetzt
 
@@ -53,7 +53,8 @@ class Canvas(QGraphicsView):
     joinRequested = Signal()                # Punkte verbinden (Hauptfenster entscheidet)
     breakRequested = Signal()               # Linie am gewählten Punkt auftrennen
     connectNodesRequested = Signal()        # zwei gewählte Punkte mit einer Linie verbinden
-    eraseRequested = Signal(list)           # Lasso-Punkte (Arbeitsfläche)
+    eraseRequested = Signal(object)         # wegzuschneidende Fläche (shapely, Arbeitsfläche)
+    eraserSizeChanged = Signal(float)       # Radierer-Durchmesser in mm ([ und ])
     jumpClicked = Signal(float, float, object)   # x, y, globale Position
     pointPicked = Signal(float, float)      # Werkzeug »pick«: Start-/Endpunkt angeklickt
     letterPicked = Signal(int)              # Punkte-Werkzeug: Buchstabe eines Schriftzugs angefasst
@@ -94,6 +95,10 @@ class Canvas(QGraphicsView):
         self._measure = None          # Messwerkzeug: [Start, Ende] in Weltkoordinaten
         self._measuring = False
         self._mouse = None            # letzte Mausposition (für die Lineal-Markierung)
+        self.eraser_size = 3.0        # Radierer: Pinsel-Durchmesser in mm
+        self.eraser_lasso = False     # Radierer: Bereich umfahren statt wie ein Pinsel radieren
+        self._erase_lasso = False     # laufender Strich wird als Lasso behandelt (Umschalt)
+        self._erase_hover = False     # Maus über der Fläche: Pinselkreis zeigen
         self._letters = None          # Anfasser der Buchstaben (Punkte-Werkzeug auf Schriftzug)
         self._letter_drag = None
         self.letter_sel = -1
@@ -345,6 +350,9 @@ class Canvas(QGraphicsView):
         p.drawText(box, Qt.AlignCenter, txt)
 
     def _draw_tool_fg(self, p, rect):
+        if self.tool == "eraser":
+            self._draw_eraser_cursor(p)
+            return
         if self.tool == "pen":
             self._draw_pen(p)
             return
@@ -602,7 +610,12 @@ class Canvas(QGraphicsView):
             return
         if self.tool in ("rect", "ellipse"):
             self.drag_start = sp
-        elif self.tool in ("freehand", "eraser", "sketch"):
+        elif self.tool == "eraser":
+            self._erase_lasso = self.eraser_lasso or bool(ev.modifiers() & Qt.ShiftModifier)
+            self.pts = [(sp.x(), sp.y())]
+            if not self._erase_lasso:
+                self.preview.setPath(geom_path(self.eraser_stroke(self.pts)))
+        elif self.tool in ("freehand", "sketch"):
             self.pts = [(sp.x(), sp.y())]
         elif self.tool == "text":
             self.textRequested.emit(sp.x(), sp.y())
@@ -700,6 +713,15 @@ class Canvas(QGraphicsView):
             self.preview.setPath(path)
         elif self.tool in ("polygon", "line", "satin") and self.pts:
             self._update_poly_preview(sp)
+        if self.tool == "eraser":
+            self._erase_hover = True
+            self._update_eraser_cursor()        # Pinselkreis folgt der Maus
+        if self.tool == "eraser" and self.pts and ev.buttons() & Qt.LeftButton \
+                and not self._erase_lasso:
+            last = self.pts[-1]
+            if math.hypot(sp.x() - last[0], sp.y() - last[1]) > min(0.4, self.eraser_size / 6):
+                self.pts.append((sp.x(), sp.y()))
+                self.preview.setPath(geom_path(self.eraser_stroke(self.pts)))
         elif self.tool in ("freehand", "eraser", "sketch") and self.pts and ev.buttons() & Qt.LeftButton:
             last = self.pts[-1]
             if math.hypot(sp.x() - last[0], sp.y() - last[1]) > 0.4:
@@ -736,8 +758,14 @@ class Canvas(QGraphicsView):
         if self.tool == "eraser":
             pts, self.pts = self.pts, []
             self.preview.setPath(QPainterPath())
-            if len(pts) > 2 and Polygon(pts).buffer(0).area > 1:
-                self.eraseRequested.emit(pts)
+            if not pts:
+                return
+            if self._erase_lasso:
+                if len(pts) > 2 and Polygon(pts).buffer(0).area > 1:
+                    self.eraseRequested.emit(Polygon(pts).buffer(0))
+            else:
+                pts.append((sp.x(), sp.y()))
+                self.eraseRequested.emit(self.eraser_stroke(pts))
             return
         if self._xf:
             xf, self._xf = self._xf, None
@@ -889,7 +917,54 @@ class Canvas(QGraphicsView):
                 self.objectCreated.emit("satin", {"a": raw[0:2 * n:2], "b": raw[1:2 * n:2]})
 
     # ------------------------------------------------------------- Tastatur
+    # ---------------------------------------------------------------- Radierer
+    def eraser_stroke(self, pts):
+        """Fläche, die der runde Radierer entlang des Strichs überstreicht (wie im Malprogramm)."""
+        r = max(self.eraser_size, 0.05) / 2
+        pts = [p for i, p in enumerate(pts) if i == 0 or p != pts[i - 1]]
+        if len(pts) == 1:
+            return Point(pts[0]).buffer(r, 24)
+        return LineString(pts).buffer(r, 24)
+
+    def set_eraser_size(self, mm):
+        self.eraser_size = round(max(0.3, min(50.0, float(mm))), 2)
+        self.eraserSizeChanged.emit(self.eraser_size)
+        self.viewport().update()
+
+    def _draw_eraser_cursor(self, p):
+        """Kreis in Radiergröße am Mauszeiger."""
+        if self.eraser_lasso or self._erase_lasso and self.pts or not self._erase_hover \
+                or self._mouse is None:
+            return
+        r = self.eraser_size / 2
+        for col, w in ((QColor(255, 255, 255, 200), 3), (QColor("#E53935"), 1.2)):
+            pen = QPen(col, w)
+            pen.setCosmetic(True)
+            p.setPen(pen)
+            p.setBrush(Qt.NoBrush)
+            p.drawEllipse(self._mouse, r, r)
+
+    def _update_eraser_cursor(self):
+        """Nur den Bereich um den alten und neuen Pinselkreis neu zeichnen."""
+        if self._mouse is None:
+            return
+        r = self.eraser_size / 2
+        rect = self.mapFromScene(QRectF(self._mouse.x() - r, self._mouse.y() - r, 2 * r, 2 * r)) \
+            .boundingRect().adjusted(-4, -4, 4, 4)
+        old, self._erase_rect = getattr(self, "_erase_rect", None), rect
+        self.viewport().update(rect.united(old) if old is not None else rect)
+
+    def leaveEvent(self, ev):
+        if self._erase_hover:
+            self._erase_hover = False
+            self.viewport().update()
+        super().leaveEvent(ev)
+
     def keyPressEvent(self, ev):
+        if self.tool == "eraser" and ev.key() in (Qt.Key_BracketLeft, Qt.Key_BracketRight):
+            f = 1.25 if ev.key() == Qt.Key_BracketRight else 1 / 1.25
+            self.set_eraser_size(self.eraser_size * f)
+            return
         if ev.key() == Qt.Key_Space and not ev.isAutoRepeat():
             self._space = True
             self.viewport().setCursor(Qt.OpenHandCursor)
