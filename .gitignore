@@ -19,3 +19,6 @@ StickStudio-Setup-*.exe
 *.swp
 .directory
 .DS_Store
+
+# Hersteller-Anleitungen (nicht weitergeben)
+Texi-Iris-10-Bedienungsanleitung.pdf
