@@ -124,7 +124,24 @@ check(f"Umschalt: umfahrener Bereich weg ({ab:.0f} → {b.world_geometry().area:
       abs((ab - b.world_geometry().area) - 400) < 25 and not b.world_geometry().contains(Point(15, 0)))
 w.set_eraser(None, True)
 check("Lasso-Modus im Menü", c.eraser_lasso and "Lasso" in w.lbl_tip.text())
+check("Lasso-Häkchen unten folgt", w.eraser_lasso_box.isChecked())
+w.eraser_lasso_box.setChecked(False)
+check("Häkchen weg = wieder Pinsel", not c.eraser_lasso)
 w.set_eraser(3, False)
+
+# ---- Einstellungen sichtbar: Leiste unten links und Pfeil am Knopf der Werkzeugleiste links
+from PySide6.QtWidgets import QToolButton
+check("Radierer-Leiste unten sichtbar", w.eraser_bar.isVisible() and w.eraser_spin.value() == 3)
+w.eraser_spin.setValue(7)
+check("Größenfeld stellt den Radierer ein", c.eraser_size == 7 and "7 mm" in w.lbl_tip.text())
+QTest.keyClick(c, Qt.Key_BracketRight)
+check("Größenfeld folgt der ]-Taste", abs(w.eraser_spin.value() - 8.8) < 0.06)
+eb = w.toolstrip.widgetForAction(w.tool_actions["eraser"])
+check("Pfeil am Radierer der linken Werkzeugleiste", isinstance(eb, QToolButton) and eb.menu() is not None
+      and eb.popupMode() == QToolButton.MenuButtonPopup)
+w.set_tool("select")
+check("Leiste verschwindet bei anderem Werkzeug", not w.eraser_bar.isVisible())
+w.set_tool("eraser")
 
 w.grab().save(sys.argv[1] + "/radierer_ui.png")
 print("ERGEBNIS:", sum(ok), "/", len(ok))
