@@ -999,13 +999,39 @@ def _jitter_runs(runs, fill):
     return [random_resample(r, length, pct, _seed(r) + k) for k, r in enumerate(runs)]
 
 
+def pull_expand(geom, pull, angle):
+    """Zugausgleich wie in Wilcom/Ink/Stitch: Der Stoff zieht sich in Stichrichtung zusammen,
+    also wird die Fläche nur in Stichrichtung (angle) um »pull« mm je Seite verlängert – nicht
+    quer dazu, wo die Reihen ohnehin eher auseinanderdrücken. Exakt die Minkowski-Summe mit der
+    Strecke ±pull: Fläche nach links und rechts verschoben plus jede Kante überstrichen."""
+    if not pull or geom.is_empty:
+        return geom
+    if pull < 0:
+        return geom.buffer(pull, join_style=2)
+    rot = affinity.rotate(geom, -angle, origin=(0, 0))
+    import numpy as np
+    parts = [rot, affinity.translate(rot, -pull, 0), affinity.translate(rot, pull, 0)]
+    v = np.array([pull, 0.0])
+    for poly in polygons_of(rot):
+        for ring in (poly.exterior, *poly.interiors):
+            c = np.asarray(ring.coords)[:, :2]
+            a, b = c[:-1], c[1:]
+            k = np.abs(b[:, 1] - a[:, 1]) > 1e-9   # waagrechte Kanten deckt die Verschiebung ab
+            quads = np.stack([a[k] - v, b[k] - v, b[k] + v, a[k] + v, a[k] - v], axis=1)
+            parts.extend(shapely.polygons(quads))
+    return affinity.rotate(shapely.union_all(parts), angle, origin=(0, 0))
+
+
 def _auto_fill(geom, fill, kind, angle, spacing, length, size, pull, keep=None, underlay=None):
     """Dichte Reihenfüllung Insel für Insel: Unterlage, dann Deckstich, dann die nächste Insel.
     Innerhalb einer Insel wird über Verbindungsstiche statt mit Sprüngen weitergestickt.
     fill["underlay_first"]: erst die Unterlage *aller* Teile, dann der Deckstich – stabilisiert
     große bzw. mehrteilige Flächen besser, kostet aber mehr Sprünge."""
     out = []
-    top = geom.buffer(pull, join_style=2) if pull else geom
+    if kind == "guided":        # Reihen folgen der Führungslinie: keine feste Stichrichtung
+        top = geom.buffer(pull, join_style=2) if pull else geom
+    else:
+        top = pull_expand(geom, pull, angle)
     islands = [p for p in polygons_of(top) if p.area > 0.02]
     if kind == "satin":
         args = dict(length=7.0, offsets=[0, 0.33, 0.67])
@@ -1105,7 +1131,7 @@ def gradient_fill(geom, fill):
     length = fill.get("stitch_len", 3.5)
     pull = fill.get("pull", 0.15)
     n = len(gradient_colors(fill))
-    top = geom.buffer(pull, join_style=2) if pull else geom
+    top = pull_expand(geom, pull, angle)
     rot = affinity.rotate(top, -angle, origin=(0, 0))
     y0, y1 = rot.bounds[1], rot.bounds[3]
     span = max(1e-6, y1 - y0)
