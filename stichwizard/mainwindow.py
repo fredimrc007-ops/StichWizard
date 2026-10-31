@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBo
                                QVBoxLayout, QWidget)
 from shapely import affinity
 from shapely.geometry import Point, Polygon
-from shapely.ops import unary_union
+from shapely.ops import linemerge, unary_union
 
 from . import curves, engine, fileio, icons
 from .autodigitize import IMAGE_EXTS, DigitizeDialog, load_image
@@ -177,6 +177,11 @@ class MainWindow(QMainWindow):
         self.palette_bar.set_chart(_threads.CURRENT_CHART)
 
         self.settings = QSettings("StickStudio", "StickStudio")
+        try:
+            self.canvas.eraser_size = max(0.3, min(50.0, float(self.settings.value("eraserSize", 3.0))))
+        except (TypeError, ValueError):
+            pass
+        self.canvas.eraserSizeChanged.connect(self._eraser_size_changed)
         self.apply_hoop()
         self.commit(initial=True)
         self.update_title()
@@ -632,7 +637,7 @@ class MainWindow(QMainWindow):
                                    ("text", "Schriftzug", "text", "T"),
                                    ("nodes", "Punkte bearbeiten", "nodes", "N"),
                                    ("connect", "Zwei Punkte mit einer Linie verbinden", "connectline", "K"),
-                                   ("eraser", "Radierer (Bereich wegschneiden)", "eraser", "X"),
+                                   ("eraser", "Radierer: über Formen wischen ([ / ] = Größe)", "eraser", "X"),
                                    ("jumps", "Sprünge & Fadenschnitte bearbeiten", "jumps", "J"),
                                    ("measure", "Messen: Abstand und Winkel ziehen (Umschalt = 45°)",
                                     "measure", "M"),
@@ -786,8 +791,8 @@ class MainWindow(QMainWindow):
             hv.addLayout(row)
 
         r.addTab(self._page([
-            self._group("Datei", [B(self.a_new), B(self.a_open), B(self.a_import), B(self.a_vector),
-                                  B(self.a_browser), B(self.a_save), B(self.a_saveas)]),
+            self._group("Datei", [B(self.a_new), B(self.a_open), B(self.a_save), B(self.a_saveas)]),
+            self._group("Importieren", [B(self.a_import), B(self.a_vector), B(self.a_browser)]),
             self._group("Bearbeiten", [B(self.a_undo), B(self.a_redo), B(self.a_dup), B(self.a_del)]),
             self._group("", [hoop_box]),       # Felder sind beschriftet – kein Gruppentitel
         ]), "Start")
@@ -824,18 +829,6 @@ class MainWindow(QMainWindow):
             self._group("Vorlagen & Bibliothek", [B(self.a_templates), B(self.a_ith),
                                                   B(self.a_library), B(self.a_libsave)]),
         ]), "Erstellen")
-
-        # Verzieren: Wiederholungen, Rahmen und Schnörkel, Strass (wie »Embellish«/»Encore«)
-        r.addTab(self._page([
-            self._group("Wiederholen", [B(self.a_encore)]),
-            self._group("Muster", [B(self.a_spiro), B(self.a_wordsculpt)]),
-            self._group("Kreuzstich", [B(self.a_cross)]),
-            self._group("Assistenten", [B(self.a_quilt), B(self.a_family)]),
-            self._group("Zeichnen & Malen", [self._sketch_btn(), B(self.a_paint),
-                                             B(self.a_printsheet)]),
-            self._group("Rahmen", [B(self.a_ornaments)]),
-            self._group("Strass & Perlen", [B(self.a_stones), B(self.a_stones_export)]),
-        ]), "Verzieren")
 
         # Schrift: alles rund um Schriftzüge (wie »Lettering« in Profiprogrammen)
         r.addTab(self._page([
@@ -892,13 +885,26 @@ class MainWindow(QMainWindow):
             self._group("Nacharbeiten", [B(self.a_auto), B(self.tool_actions["nodes"])]),
         ]), "Nachzeichnen")
 
+        # Verzieren: erst Schmuck für das vorhandene Design (Wiederholen, Rahmen, Muster, Strass),
+        # dann die Ateliers und Assistenten (wie »Embellish«/»Encore«)
+        r.addTab(self._page([
+            self._group("Wiederholen", [B(self.a_encore)]),
+            self._group("Rahmen", [B(self.a_ornaments)]),
+            self._group("Muster", [B(self.a_spiro), B(self.a_wordsculpt)]),
+            self._group("Strass & Perlen", [B(self.a_stones), B(self.a_stones_export)]),
+            self._group("Kreuzstich", [B(self.a_cross)]),
+            self._group("Zeichnen & Malen", [self._sketch_btn(), B(self.a_paint),
+                                             B(self.a_printsheet)]),
+            self._group("Assistenten", [B(self.a_quilt), B(self.a_family)]),
+        ]), "Verzieren")
+
         for key, label in (("nodes", "Punkte\nbearbeiten"), ("eraser", "Radierer"),
                            ("jumps", "Sprünge\nbearbeiten"), ("connect", "Mit Linie\nverbinden")):
             self.tool_actions[key].setIconText(label)
         # Bearbeiten: die Kontur eines einzelnen Objekts formen
         r.addTab(self._page([
             self._group("Werkzeuge", [B(self.tool_actions["nodes"]), B(self.tool_actions["connect"]),
-                                      B(self.tool_actions["eraser"])]),
+                                      self._eraser_btn()]),
             self._group("Punkte", [B(self.a_addnode), B(self.a_joinnode), B(self.a_breaknode),
                                    B(self.a_corner), B(self.a_curvept), B(self.a_auto),
                                    B(self.a_simplify)]),
@@ -935,31 +941,29 @@ class MainWindow(QMainWindow):
             self._group("Verbessern", [B(self.a_overlap), self._knockout_btn(),
                                        B(self.a_cleanup)]),
             self._group("Reihenfolge", [B(self.a_up), B(self.a_down), B(self.a_colorsort)]),
-            self._group("Sprünge", [B(self.a_optjumps), B(self.tool_actions["jumps"]),
-                                    B(self.a_tostitch)]),
-            self._group("Stiche", [B(self.a_stitchedit)]),
+            self._group("Sprünge", [B(self.a_optjumps), B(self.tool_actions["jumps"])]),
+            self._group("Stiche", [B(self.a_tostitch), B(self.a_stitchedit)]),
             self._group("Prüfen", [B(self.a_sim), B(self.a_density)]),
         ]), "Optimieren")
-
-        r.addTab(self._page([
-            self._group("Messen", [B(self.a_rulers), B(self.tool_actions["measure"])]),
-            self._group("Darstellung", [B(self.a_real), B(self.a_stitch), B(self.a_jumps),
-                                        self._grid_btn()]),
-            self._group("Zoom", [B(self.a_zin), B(self.a_zout), B(self.a_fit)]),
-            self._group("Vorschau", [B(self.a_mockup)]),
-            self._group("Oberfläche", [self._theme_btn(), B(self.a_ui)]),
-        ]), "Ansicht")
 
         exp_btn = B(self.a_export)
         r.addTab(self._page([
             self._group("Maschine", [self._machine_btn(), B(self.a_send), exp_btn,
                                      B(self.a_multiexport), B(self.a_multihoop)]),
-            self._group("Drucken & Bild", [B(self.a_sheet), B(self.a_png), B(self.a_mockup),
-                                           B(self.a_cutfile), B(self.a_stones_export),
-                                           B(self.a_ith_pdf), B(self.a_printsheet),
-                                           B(self.a_video)]),
+            self._group("Drucken", [B(self.a_sheet), B(self.a_ith_pdf), B(self.a_printsheet)]),
+            self._group("Schablonen", [B(self.a_cutfile), B(self.a_stones_export)]),
+            self._group("Bild & Video", [B(self.a_png), B(self.a_mockup), B(self.a_video)]),
             self._group("Information", [B(self.a_info)]),
         ]), "Export")
+
+        r.addTab(self._page([
+            self._group("Zoom", [B(self.a_zin), B(self.a_zout), B(self.a_fit)]),
+            self._group("Darstellung", [B(self.a_real), B(self.a_stitch), B(self.a_jumps),
+                                        self._grid_btn()]),
+            self._group("Messen", [B(self.a_rulers), B(self.tool_actions["measure"])]),
+            self._group("Vorschau", [B(self.a_mockup)]),
+            self._group("Oberfläche", [self._theme_btn(), B(self.a_ui)]),
+        ]), "Ansicht")
         r.addTab(self._page([
             self._group("Hilfe", [B(self.a_keys), B(self.a_guide), B(self.a_manual)]),
             self._group("KI", [B(self.a_mcp)]),
@@ -1128,6 +1132,48 @@ class MainWindow(QMainWindow):
             f"<tr><td>Rahmen {w:g} × {h:g} mm</td><td><b>{'passt' if fits else 'GRÖSSER als das Stickfeld!'}</b></td></tr>"
             "</table><p><small>Angaben laut Hersteller/Händler – bitte mit dem Handbuch "
             "abgleichen.</small></p>"))
+
+    ERASER_SIZES = (0.5, 1, 2, 3, 5, 8, 12, 20)
+
+    def _eraser_btn(self):
+        """Radierer: Klick schaltet das Werkzeug ein, der Pfeil wählt Größe bzw. Lasso."""
+        b = self._rbtn(self.tool_actions["eraser"])
+        b.setPopupMode(QToolButton.MenuButtonPopup)
+        m = QMenu(self)
+        m.aboutToShow.connect(lambda: self._fill_eraser_menu(m))
+        b.setMenu(m)
+        return b
+
+    def _fill_eraser_menu(self, m):
+        m.clear()
+        cur = self.canvas.eraser_size
+        for mm in self.ERASER_SIZES:
+            a = m.addAction(f"Pinsel {mm:g} mm", lambda v=mm: self.set_eraser(v, False))
+            a.setCheckable(True)
+            a.setChecked(not self.canvas.eraser_lasso and abs(cur - mm) < 1e-6)
+        m.addSeparator()
+        a = m.addAction("Lasso: Bereich umfahren", lambda: self.set_eraser(None, True))
+        a.setCheckable(True)
+        a.setChecked(self.canvas.eraser_lasso)
+
+    def set_eraser(self, size=None, lasso=False):
+        self.canvas.eraser_lasso = bool(lasso)
+        if size is not None:
+            self.canvas.set_eraser_size(size)
+        self.set_tool("eraser")
+
+    def _eraser_size_changed(self, mm):
+        self.settings.setValue("eraserSize", mm)
+        if self.canvas.tool == "eraser":
+            self.lbl_tip.setText(self._eraser_tip())
+
+    def _eraser_tip(self):
+        if self.canvas.eraser_lasso:
+            return ("Radierer (Lasso): Bereich umfahren, der weggeschnitten werden soll · "
+                    "Pinsel-Radierer über den Pfeil am Knopf")
+        return (f"Radierer {self.canvas.eraser_size:g} mm: mit gedrückter Maustaste über die Form "
+                "wischen · [ / ] = kleiner/größer · Umschalt+Ziehen = Bereich umfahren (Lasso) · "
+                "wirkt auf die ausgewählten Formen, sonst auf alle darunter")
 
     def _sketch_btn(self):
         """Sketch: Klick schaltet das Werkzeug ein, der Pfeil wählt den Stil."""
@@ -1548,6 +1594,8 @@ class MainWindow(QMainWindow):
                            ("Säulen-Satin", k(T["satin"])),
                            ("Schriftzug", k(T["text"])), ("Punkte bearbeiten", k(T["nodes"])), ("Mit Linie verbinden", k(T["connect"])),
                            ("Radierer", k(T["eraser"])),
+                           ("Radierer kleiner / größer", "[  /  ]"),
+                           ("Radierer: Bereich umfahren (Lasso)", "Umschalt + Ziehen"),
                            ("Sprünge & Fadenschnitte bearbeiten", k(T["jumps"])),
                            ("Zurück zum Auswählen", "Esc")]),
             ("Bearbeiten", [("Rückgängig", k(self.a_undo)),
@@ -1910,8 +1958,7 @@ class MainWindow(QMainWindow):
             "jumps": "Orange = Sprung, Rot mit ✕ = Sprung mit Fadenschnitt · Klick auf einen Sprung: "
                      "Fadenschnitt setzen/entfernen oder mit Stichen verbinden · Klick auf einen Stich "
                      "einer Stickdatei: in Sprung umwandeln",
-            "eraser": "Bereich umfahren, der weggeschnitten werden soll (wirkt auf die ausgewählten "
-                      "Formen, sonst auf alle darunter)",
+            "eraser": self._eraser_tip(),
             "measure": "Messen: von Punkt zu Punkt ziehen – Abstand, waagerecht/senkrecht und Winkel "
                        "erscheinen an der Linie · Umschalt = in 45°-Schritten",
         }
@@ -4127,34 +4174,54 @@ class MainWindow(QMainWindow):
         bx, by = o.to_local(0, 1)
         return [ax - ox, bx - ox, ay - oy, by - oy, ox, oy]
 
-    def erase(self, pts):
-        cut = Polygon(pts).buffer(0)
+    def erase(self, cut):
+        """Schneidet die Fläche `cut` (Pinselstrich oder Lasso, Arbeitsfläche) aus den ausgewählten
+        Formen, sonst aus allen darunter – wie ein Radierer im Malprogramm. Durchgeschnittene
+        Linien bleiben in allen Stücken erhalten."""
+        if not hasattr(cut, "geom_type"):            # alte Aufrufer: Liste von Lasso-Punkten
+            cut = Polygon(cut).buffer(0)
+        if cut.is_empty:
+            return
         targets = [o for o in self.selected_objects() if o.kind in ("shape", "text", "line")]
         if not targets:
             targets = [o for o in self.doc.objects if o.kind in ("shape", "text", "line") and o.visible
                        and o.world_geometry() is not None and o.world_geometry().intersects(cut)]
-        changed, removed = [], []
+        changed, removed, added = [], [], []
         for o in targets:
             wg = o.world_geometry()
             if wg is None or not wg.intersects(cut):
                 continue
             if o.kind == "text":
                 self._text_to_shape(o)
-            local_cut = Polygon([o.to_local(x, y) for x, y in cut.exterior.coords]).buffer(0)
-            rest = o.raw_geometry().difference(local_cut)
+            local_cut = affinity.affine_transform(cut, self._inverse_matrix(o))
+            raw = o.raw_geometry()
+            rest = raw.difference(local_cut)
             if o.kind == "line":
-                parts = sorted(lines_of(rest), key=lambda l: -l.length)
-                if not parts or parts[0].length < 1:
+                if o.closed and rest.geom_type == "MultiLineString":
+                    rest = linemerge(rest)               # Stücke am alten Startpunkt zusammenfügen
+                parts = sorted((l for l in lines_of(rest) if l.length >= 1), key=lambda l: -l.length)
+                if not parts:
                     removed.append(o)
                     continue
-                rest = parts[0]
-            if rest.is_empty or rest.area < 0.3 and o.kind != "line":
+                if rest.length < raw.length - 1e-6:      # angeschnitten: ab jetzt offene Linie(n)
+                    o.closed = False
+                o.set_raw_geometry(parts[0])
+                changed.append(o)
+                for piece in parts[1:]:
+                    c = o.clone()
+                    c.set_raw_geometry(piece)
+                    added.append((o, c))
+                continue
+            if rest.is_empty or rest.area < 0.3:
                 removed.append(o)
                 continue
             o.set_raw_geometry(rest)
             changed.append(o)
         if not changed and not removed:
             return
+        for orig, c in added:                            # neue Stücke direkt hinter dem Original
+            i = next(k for k, x in enumerate(self.doc.objects) if x is orig)
+            self.doc.objects.insert(i + 1, c)
         if removed:
             ids = {o.id for o in removed}
             self.doc.objects = [o for o in self.doc.objects if o.id not in ids]

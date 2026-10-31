@@ -28,7 +28,7 @@ def check(n, c):
     print("✓" if c else "✗", n)
 
 
-check(f"Version {stichwizard.__version__}", stichwizard.__version__ == "1.31.0")
+check(f"Version {stichwizard.__version__}", stichwizard.__version__ == "1.32.0")
 cfg = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
 check(f"Daten im Testordner ({cfg})", cfg.startswith(OUT))
 MAN = "/app/share/stichwizard/docs/StichWizard-Anleitung.pdf"

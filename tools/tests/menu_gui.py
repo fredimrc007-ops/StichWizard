@@ -17,8 +17,8 @@ r = w.ribbon
 
 # ---- Reiter in Arbeitsschritt-Reihenfolge
 names = [r.tabText(i) for i in range(r.count())]
-want = ["Start", "Erstellen", "Verzieren", "Schrift", "Nachzeichnen", "Form bearbeiten",
-        "Anordnen", "Sticken", "Optimieren", "Ansicht", "Export", "Hilfe"]
+want = ["Start", "Erstellen", "Schrift", "Nachzeichnen", "Verzieren", "Form bearbeiten",
+        "Anordnen", "Sticken", "Optimieren", "Export", "Ansicht", "Hilfe"]
 check(f"Reiter in Arbeitsschritt-Reihenfolge {names}", names == want)
 
 def where(act):
@@ -47,8 +47,8 @@ for act, tab in ((w.a_templates, "Erstellen"), (w.a_library, "Erstellen"),
                  (w.a_video, "Export")):
     check(f"{act.iconText().replace(chr(10), ' ')} genau in »{tab}«", where(act) == [tab])
 check("Simulator im Reiter Optimieren", where(w.a_sim) == ["Optimieren"])
-check("Produktvorschau in Ansicht und Export", where(w.a_mockup) == ["Ansicht", "Export"])
-check("Text in Form in Verzieren und Schrift", where(w.a_wordsculpt) == ["Verzieren", "Schrift"])
+check("Produktvorschau in Export und Ansicht", where(w.a_mockup) == ["Export", "Ansicht"])
+check("Text in Form in Schrift und Verzieren", where(w.a_wordsculpt) == ["Schrift", "Verzieren"])
 check("Druckvorlage in Verzieren und Export", where(w.a_printsheet) == ["Verzieren", "Export"])
 check("Strass-Schablone in Verzieren und Export",
       where(w.a_stones_export) == ["Verzieren", "Export"])

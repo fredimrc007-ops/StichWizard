@@ -132,7 +132,7 @@ A(h2("Der Bildschirm"))
 A(img("screen_main", 100, "Das Hauptfenster mit einem Beispiel-Design"))
 A(table([
     ["<b>Menüband</b> (oben)", "Alle Funktionen, nach Arbeitsschritten in Reiter sortiert wie in Profi-Sticksoftware: Start, "
-     "Erstellen, Schrift, Nachzeichnen, Form bearbeiten, Anordnen, Sticken, Optimieren, Ansicht, Export, Hilfe."],
+     "Erstellen, Schrift, Nachzeichnen, Verzieren, Form bearbeiten, Anordnen, Sticken, Optimieren, Export, Ansicht, Hilfe."],
     ["<b>Werkzeugleiste</b> (links)", "Auswahl, Rechteck, Ellipse, Vieleck, Linie, Freihand, "
      "Säulen-Satin, Text, Punkte bearbeiten, Mit Linie verbinden, Radierer, Sprünge bearbeiten, "
      "Bild-Assistent und Simulator."],
@@ -631,7 +631,11 @@ A(table(with_ex(EX_NODES, [
     ["Rundungen erkennen", "Eckige, digitalisierte Konturen in wenige saubere Ecken und Rundungen "
      "verwandeln."],
     ["Punkte reduzieren", "Weniger Punkte – übersichtlicher beim Bearbeiten."],
-    ["Radierer", f"Werkzeug {K('X')}: über eine Form malen, der Bereich wird entfernt."],
+    ["Radierer", f"Werkzeug {K('X')}: wie im Malprogramm mit gedrückter Maustaste über eine Form "
+     "wischen, der runde Pinsel entfernt alles, was er überstreicht (Kreis am Mauszeiger zeigt die "
+     f"Größe). {K('[')} / {K(']')} = kleiner/größer, Größen auch über den Pfeil am Knopf. "
+     "Umschalt + Ziehen umfährt einen Bereich (Lasso). Durchgeschnittene Linien bleiben in allen "
+     "Stücken erhalten."],
 ]), ["Aktion", "So geht's", "Beispiel"], [18, 50, 32]))
 A(h2("Teile: Zerlegen, Kombinieren, Ausschneiden"))
 A(p("<b>Zerlegen</b> macht aus einer mehrteiligen Form einzelne Formen, <b>Kombinieren</b> fasst "
