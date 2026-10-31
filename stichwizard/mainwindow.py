@@ -791,8 +791,8 @@ class MainWindow(QMainWindow):
             hv.addLayout(row)
 
         r.addTab(self._page([
-            self._group("Datei", [B(self.a_new), B(self.a_open), B(self.a_import), B(self.a_vector),
-                                  B(self.a_browser), B(self.a_save), B(self.a_saveas)]),
+            self._group("Datei", [B(self.a_new), B(self.a_open), B(self.a_save), B(self.a_saveas)]),
+            self._group("Importieren", [B(self.a_import), B(self.a_vector), B(self.a_browser)]),
             self._group("Bearbeiten", [B(self.a_undo), B(self.a_redo), B(self.a_dup), B(self.a_del)]),
             self._group("", [hoop_box]),       # Felder sind beschriftet – kein Gruppentitel
         ]), "Start")
@@ -829,18 +829,6 @@ class MainWindow(QMainWindow):
             self._group("Vorlagen & Bibliothek", [B(self.a_templates), B(self.a_ith),
                                                   B(self.a_library), B(self.a_libsave)]),
         ]), "Erstellen")
-
-        # Verzieren: Wiederholungen, Rahmen und Schnörkel, Strass (wie »Embellish«/»Encore«)
-        r.addTab(self._page([
-            self._group("Wiederholen", [B(self.a_encore)]),
-            self._group("Muster", [B(self.a_spiro), B(self.a_wordsculpt)]),
-            self._group("Kreuzstich", [B(self.a_cross)]),
-            self._group("Assistenten", [B(self.a_quilt), B(self.a_family)]),
-            self._group("Zeichnen & Malen", [self._sketch_btn(), B(self.a_paint),
-                                             B(self.a_printsheet)]),
-            self._group("Rahmen", [B(self.a_ornaments)]),
-            self._group("Strass & Perlen", [B(self.a_stones), B(self.a_stones_export)]),
-        ]), "Verzieren")
 
         # Schrift: alles rund um Schriftzüge (wie »Lettering« in Profiprogrammen)
         r.addTab(self._page([
@@ -897,6 +885,19 @@ class MainWindow(QMainWindow):
             self._group("Nacharbeiten", [B(self.a_auto), B(self.tool_actions["nodes"])]),
         ]), "Nachzeichnen")
 
+        # Verzieren: erst Schmuck für das vorhandene Design (Wiederholen, Rahmen, Muster, Strass),
+        # dann die Ateliers und Assistenten (wie »Embellish«/»Encore«)
+        r.addTab(self._page([
+            self._group("Wiederholen", [B(self.a_encore)]),
+            self._group("Rahmen", [B(self.a_ornaments)]),
+            self._group("Muster", [B(self.a_spiro), B(self.a_wordsculpt)]),
+            self._group("Strass & Perlen", [B(self.a_stones), B(self.a_stones_export)]),
+            self._group("Kreuzstich", [B(self.a_cross)]),
+            self._group("Zeichnen & Malen", [self._sketch_btn(), B(self.a_paint),
+                                             B(self.a_printsheet)]),
+            self._group("Assistenten", [B(self.a_quilt), B(self.a_family)]),
+        ]), "Verzieren")
+
         for key, label in (("nodes", "Punkte\nbearbeiten"), ("eraser", "Radierer"),
                            ("jumps", "Sprünge\nbearbeiten"), ("connect", "Mit Linie\nverbinden")):
             self.tool_actions[key].setIconText(label)
@@ -940,31 +941,29 @@ class MainWindow(QMainWindow):
             self._group("Verbessern", [B(self.a_overlap), self._knockout_btn(),
                                        B(self.a_cleanup)]),
             self._group("Reihenfolge", [B(self.a_up), B(self.a_down), B(self.a_colorsort)]),
-            self._group("Sprünge", [B(self.a_optjumps), B(self.tool_actions["jumps"]),
-                                    B(self.a_tostitch)]),
-            self._group("Stiche", [B(self.a_stitchedit)]),
+            self._group("Sprünge", [B(self.a_optjumps), B(self.tool_actions["jumps"])]),
+            self._group("Stiche", [B(self.a_tostitch), B(self.a_stitchedit)]),
             self._group("Prüfen", [B(self.a_sim), B(self.a_density)]),
         ]), "Optimieren")
-
-        r.addTab(self._page([
-            self._group("Messen", [B(self.a_rulers), B(self.tool_actions["measure"])]),
-            self._group("Darstellung", [B(self.a_real), B(self.a_stitch), B(self.a_jumps),
-                                        self._grid_btn()]),
-            self._group("Zoom", [B(self.a_zin), B(self.a_zout), B(self.a_fit)]),
-            self._group("Vorschau", [B(self.a_mockup)]),
-            self._group("Oberfläche", [self._theme_btn(), B(self.a_ui)]),
-        ]), "Ansicht")
 
         exp_btn = B(self.a_export)
         r.addTab(self._page([
             self._group("Maschine", [self._machine_btn(), B(self.a_send), exp_btn,
                                      B(self.a_multiexport), B(self.a_multihoop)]),
-            self._group("Drucken & Bild", [B(self.a_sheet), B(self.a_png), B(self.a_mockup),
-                                           B(self.a_cutfile), B(self.a_stones_export),
-                                           B(self.a_ith_pdf), B(self.a_printsheet),
-                                           B(self.a_video)]),
+            self._group("Drucken", [B(self.a_sheet), B(self.a_ith_pdf), B(self.a_printsheet)]),
+            self._group("Schablonen", [B(self.a_cutfile), B(self.a_stones_export)]),
+            self._group("Bild & Video", [B(self.a_png), B(self.a_mockup), B(self.a_video)]),
             self._group("Information", [B(self.a_info)]),
         ]), "Export")
+
+        r.addTab(self._page([
+            self._group("Zoom", [B(self.a_zin), B(self.a_zout), B(self.a_fit)]),
+            self._group("Darstellung", [B(self.a_real), B(self.a_stitch), B(self.a_jumps),
+                                        self._grid_btn()]),
+            self._group("Messen", [B(self.a_rulers), B(self.tool_actions["measure"])]),
+            self._group("Vorschau", [B(self.a_mockup)]),
+            self._group("Oberfläche", [self._theme_btn(), B(self.a_ui)]),
+        ]), "Ansicht")
         r.addTab(self._page([
             self._group("Hilfe", [B(self.a_keys), B(self.a_guide), B(self.a_manual)]),
             self._group("KI", [B(self.a_mcp)]),

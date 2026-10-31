@@ -78,8 +78,8 @@ Voraussetzungen (CachyOS/Arch): `sudo pacman -S pyside6 python-shapely python-nu
   - **Startpunkt/Endpunkt** je Fläche oder Satinsäule anklicken (wie die Ink/Stitch-Befehle)
   - **Säulen-Satin:** Kurze Stiche in engen Kurven (Einrückung und Abstand einstellbar),
     Max. Stichlänge und „Zufällig teilen“ für breite Säulen
-- **Menüband nach Arbeitsschritten (ab 1.15):** Start · Erstellen · Verzieren · Schrift · Nachzeichnen ·
-  Form bearbeiten · Anordnen · Sticken · Optimieren · Ansicht · Export · Hilfe – geordnet wie in
+- **Menüband nach Arbeitsschritten (ab 1.15):** Start · Erstellen · Schrift · Nachzeichnen · Verzieren ·
+  Form bearbeiten · Anordnen · Sticken · Optimieren · Export · Ansicht · Hilfe – geordnet wie in
   Profi-Sticksoftware; Farbschema hell/dunkel mit 7 Akzentfarben (Ansicht › Farbschema);
   Karo-Raster im Rahmen (jede 5. Linie kräftiger)
 - **Eigene Designs (ab 1.14):** Bézier-Stift mit Anfassern (auch im Punkte-Werkzeug), Ebenen,

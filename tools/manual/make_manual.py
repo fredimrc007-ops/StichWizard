@@ -132,7 +132,7 @@ A(h2("Der Bildschirm"))
 A(img("screen_main", 100, "Das Hauptfenster mit einem Beispiel-Design"))
 A(table([
     ["<b>Menüband</b> (oben)", "Alle Funktionen, nach Arbeitsschritten in Reiter sortiert wie in Profi-Sticksoftware: Start, "
-     "Erstellen, Schrift, Nachzeichnen, Form bearbeiten, Anordnen, Sticken, Optimieren, Ansicht, Export, Hilfe."],
+     "Erstellen, Schrift, Nachzeichnen, Verzieren, Form bearbeiten, Anordnen, Sticken, Optimieren, Export, Ansicht, Hilfe."],
     ["<b>Werkzeugleiste</b> (links)", "Auswahl, Rechteck, Ellipse, Vieleck, Linie, Freihand, "
      "Säulen-Satin, Text, Punkte bearbeiten, Mit Linie verbinden, Radierer, Sprünge bearbeiten, "
      "Bild-Assistent und Simulator."],
