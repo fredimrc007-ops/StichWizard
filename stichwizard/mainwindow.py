@@ -1161,17 +1161,19 @@ class MainWindow(QMainWindow):
         if size is not None:
             self.canvas.set_eraser_size(size)
         self.set_tool("eraser")
+        self._sync_eraser_bar()
 
     def _eraser_size_changed(self, mm):
         self.settings.setValue("eraserSize", mm)
+        self._sync_eraser_bar()
         if self.canvas.tool == "eraser":
             self.lbl_tip.setText(self._eraser_tip())
 
     def _eraser_tip(self):
         if self.canvas.eraser_lasso:
             return ("Radierer (Lasso): Bereich umfahren, der weggeschnitten werden soll · "
-                    "Pinsel-Radierer über den Pfeil am Knopf")
-        return (f"Radierer {self.canvas.eraser_size:g} mm: mit gedrückter Maustaste über die Form "
+                    "Häkchen »Lasso« weg = wieder wischen")
+        return (f"Radierer {round(self.canvas.eraser_size, 1):g} mm: mit gedrückter Maustaste über die Form "
                 "wischen · [ / ] = kleiner/größer · Umschalt+Ziehen = Bereich umfahren (Lasso) · "
                 "wirkt auf die ausgewählten Formen, sonst auf alle darunter")
 
@@ -1415,8 +1417,51 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         for a in (self.a_digit, self.a_sim):
             tb.addAction(a)
+        eb = tb.widgetForAction(self.tool_actions["eraser"])     # Pfeil: Größe / Lasso
+        if isinstance(eb, QToolButton):
+            m = QMenu(self)
+            m.aboutToShow.connect(lambda: self._fill_eraser_menu(m))
+            eb.setMenu(m)
+            eb.setPopupMode(QToolButton.MenuButtonPopup)
         tb.setFixedWidth(56)
         return tb
+
+    def _make_eraser_bar(self):
+        """Radierer-Einstellungen unten links – nur sichtbar, solange der Radierer gewählt ist."""
+        bar = QWidget()
+        h = QHBoxLayout(bar)
+        h.setContentsMargins(0, 0, 8, 0)
+        h.setSpacing(6)
+        h.addWidget(QLabel("Radierer:"))
+        sp = QDoubleSpinBox()
+        sp.setRange(0.3, 50.0)
+        sp.setDecimals(1)
+        sp.setSingleStep(0.5)
+        sp.setSuffix(" mm")
+        sp.setToolTip("Pinselgröße des Radierers (auch mit [ und ])")
+        sp.setMaximumHeight(QLabel().sizeHint().height() + 2)   # Statusleiste nicht höher machen
+        sp.setValue(self.canvas.eraser_size)
+        sp.valueChanged.connect(lambda v: abs(v - self.canvas.eraser_size) > 0.04
+                                and self.canvas.set_eraser_size(v))
+        h.addWidget(sp)
+        cb = QCheckBox("Lasso")
+        cb.setToolTip("Bereich umfahren statt wischen (geht auch mit Umschalt beim Ziehen)")
+        cb.toggled.connect(lambda on: self.set_eraser(None, on))
+        h.addWidget(cb)
+        self.eraser_spin, self.eraser_lasso_box, self.eraser_bar = sp, cb, bar
+        bar.hide()
+        return bar
+
+    def _sync_eraser_bar(self):
+        if not hasattr(self, "eraser_bar"):
+            return
+        self.eraser_bar.setVisible(self.canvas.tool == "eraser")
+        for wdg, val in ((self.eraser_spin, self.canvas.eraser_size),
+                         (self.eraser_lasso_box, self.canvas.eraser_lasso)):
+            wdg.blockSignals(True)
+            (wdg.setValue if wdg is self.eraser_spin else wdg.setChecked)(val)
+            wdg.blockSignals(False)
+        self.eraser_spin.setEnabled(not self.canvas.eraser_lasso)
 
     def _make_status(self):
         sb = self.statusBar()
@@ -1424,6 +1469,7 @@ class MainWindow(QMainWindow):
         self.lbl_stats = QLabel()
         self.lbl_zoom = QLabel()
         self.lbl_tip = QLabel()
+        sb.addWidget(self._make_eraser_bar())
         sb.addWidget(self.lbl_tip, 1)
         self.lbl_ai = QLabel()
         self.lbl_ai.setToolTip("KI-Schnittstelle (MCP) – Einrichtung unter Hilfe › KI-Anbindung")
@@ -1936,6 +1982,7 @@ class MainWindow(QMainWindow):
             return
         self.tool_actions[tool].setChecked(True)
         self.canvas.set_tool(tool)
+        self._sync_eraser_bar()
         tips = {
             "select": "Klicken zum Auswählen · Ziehen zum Verschieben · Ecken: Größe · Kreis oben: Drehen (Umschalt = 15°)",
             "rect": "Rechteck aufziehen · Umschalt = Quadrat",

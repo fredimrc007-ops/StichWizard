@@ -86,6 +86,8 @@ QToolButton#swatch { border-radius: 12px; padding: 1px; }
 QToolButton#swatch:hover { background: #DDE1E8; }
 QStatusBar { background: #232634; color: #C9CEDA; }
 QStatusBar QLabel { color: #C9CEDA; padding: 0 10px; }
+QStatusBar QCheckBox { color: #C9CEDA; }
+QStatusBar QDoubleSpinBox { padding: 0 2px; min-height: 0; max-height: 18px; }
 QMenu { background: white; border: 1px solid #D9DEE6; border-radius: 8px; padding: 4px; }
 QScrollArea#paletteScroll QScrollBar:horizontal { height: 6px; background: transparent; }
 QScrollArea#paletteScroll QScrollBar::handle:horizontal { background: #C9CFD9; border-radius: 3px; min-width: 40px; }
