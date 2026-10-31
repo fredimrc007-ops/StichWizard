@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-stickstudio-project">
+    <comment>StichWizard-Projekt</comment>
+    <comment xml:lang="en">StichWizard project</comment>
+    <glob pattern="*.stickproj"/>
+  </mime-type>
+  <mime-type type="application/x-pes">
+    <comment>Brother-Stickdatei (PES)</comment>
+    <glob pattern="*.pes"/>
+  </mime-type>
+  <mime-type type="application/x-dst">
+    <comment>Tajima-Stickdatei (DST)</comment>
+    <glob pattern="*.dst"/>
+  </mime-type>
+  <mime-type type="application/x-jef">
+    <comment>Janome-Stickdatei (JEF)</comment>
+    <glob pattern="*.jef"/>
+  </mime-type>
+  <mime-type type="application/x-exp">
+    <comment>Melco-Stickdatei (EXP)</comment>
+    <glob pattern="*.exp"/>
+  </mime-type>
+  <mime-type type="application/x-vp3">
+    <comment>Pfaff/Husqvarna-Stickdatei (VP3)</comment>
+    <glob pattern="*.vp3"/>
+  </mime-type>
+</mime-info>

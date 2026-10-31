@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@APPID@</id>
+  <name>StichWizard</name>
+  <summary>Stickdesigns erstellen und für Stickmaschinen exportieren</summary>
+  <summary xml:lang="en">Create embroidery designs for embroidery machines</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <description>
+    <p>StichWizard ist eine Sticksoftware im Stil gängiger Hobby-Programme: Formen, Linien und
+    Schriftzüge zeichnen, Bilder automatisch oder von Hand digitalisieren, Füllmuster und
+    Säulen-Satin, 129 Stickschriften, Applikationen, Garnkarten der großen Hersteller,
+    realistische Sticksimulation mit Stick-Optimierer sowie Export als PES, DST, JEF, EXP,
+    VP3 und XXX.</p>
+    <p>Eine automatische Stichreihenfolge sorgt für möglichst wenige Sprungstiche; über das
+    Model Context Protocol (MCP) kann ein KI-Assistent das Programm bedienen.</p>
+  </description>
+  <launchable type="desktop-id">@APPID@.desktop</launchable>
+  <provides>
+    <binary>stichwizard</binary>
+    <mediatype>application/x-stickstudio-project</mediatype>
+  </provides>
+  <categories>
+    <category>Graphics</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@DATE@"/>
+  </releases>
+</component>

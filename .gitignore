@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Build-Ergebnisse und Installer
+build/
+dist/
+*.flatpak
+StichWizard-Setup-*.exe
+StickStudio-Setup-*.exe
+
+# Lokale Einstellungen
+.claude/
+.vscode/
+.idea/
+*.swp
+.directory
+.DS_Store

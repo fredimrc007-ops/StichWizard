@@ -1,0 +1,66 @@
+StichWizard – Lizenzen der mitgelieferten Bestandteile
+======================================================
+
+StichWizard selbst ist für die private Nutzung gedacht. Es verwendet die folgenden
+Bestandteile Dritter; deren Lizenzen gelten unverändert. Die Volltexte liegen in
+diesem Ordner.
+
+Python 3.14.8
+  Lizenz: PSF-2.0 (PSF-2.0.txt)
+  https://www.python.org
+
+Qt for Python (PySide6) mit Qt 6.12.0
+  Lizenz: LGPL-3.0-only (Qt, PySide6)
+  https://www.qt.io
+  Quellcode: https://download.qt.io/official_releases/QtForPython/ und https://download.qt.io/official_releases/qt/
+
+Shiboken6 6.12.0
+  Lizenz: LGPL-3.0-only
+  https://www.qt.io
+  Quellcode: https://download.qt.io/official_releases/QtForPython/
+
+Shapely (mit GEOS) 2.2.0
+  Lizenz: BSD-3-Clause; GEOS: LGPL-2.1
+  https://shapely.readthedocs.io
+  Quellcode: https://github.com/shapely/shapely, https://libgeos.org
+  Lizenzdateien: shapely-LICENSE.txt
+
+NumPy 2.5.4
+  Lizenz: BSD-3-Clause (mitgelieferte Teile siehe numpy-Lizenzdateien)
+  https://numpy.org
+  Quellcode: https://github.com/numpy/numpy
+  Lizenzdateien: numpy-LICENSE.txt, numpy-numpy__core_include_numpy_libdivide_LICENSE.txt, numpy-numpy__core_src_common_pythoncapi-compat_COPYING.txt, numpy-numpy__core_src_highway_LICENSE.txt, numpy-numpy__core_src_multiarray_dragon4_LICENSE.txt, numpy-numpy__core_src_npysort_x86-simd-sort_LICENSE.md.txt, numpy-numpy__core_src_umath_svml_LICENSE.txt, numpy-numpy_fft_pocketfft_LICENSE.md.txt, numpy-numpy_linalg_lapack_lite_LICENSE.txt, numpy-numpy_ma_LICENSE.txt, numpy-numpy_random_LICENSE.md.txt, numpy-numpy_random_src_distributions_LICENSE.md.txt, numpy-numpy_random_src_mt19937_LICENSE.md.txt, numpy-numpy_random_src_pcg64_LICENSE.md.txt, numpy-numpy_random_src_philox_LICENSE.md.txt, numpy-numpy_random_src_sfc64_LICENSE.md.txt, numpy-numpy_random_src_splitmix64_LICENSE.md.txt
+
+pyembroidery 1.5.1
+  Lizenz: MIT
+  https://github.com/EmbroidePy/pyembroidery
+  Quellcode: https://github.com/EmbroidePy/pyembroidery
+  Lizenzdateien: pyembroidery-LICENSE.txt
+
+pypdf (Illustrator-/PDF-Import) 6.21.2
+  Lizenz: BSD-3-Clause
+  https://pypdf.readthedocs.io
+  Quellcode: https://github.com/py-pdf/pypdf
+  Lizenzdateien: pypdf-LICENSE.txt
+
+Hinweis zu Qt/PySide6 und GEOS (LGPL):
+  Diese Bibliotheken werden unverändert als eigene Dateien mitgeliefert und dynamisch
+  geladen. Du darfst sie durch eigene, kompatible Versionen ersetzen. Den Quellcode
+  der verwendeten Versionen gibt es unter den oben genannten Adressen; auf Anfrage
+  wird er auch direkt zur Verfügung gestellt. Volltexte: LGPL-3.0.txt, LGPL-2.1.txt,
+  GPL-3.0.txt.
+
+Stickschriften (129)
+  Aus der Ink/Stitch-Schriftensammlung, je Schrift eigene Lizenz: SIL Open Font
+  License 1.1, CC BY-SA 2.5/4.0, CC BY-ND 4.0, CC BY-NC-SA 4.0 oder gemeinfrei.
+  Urheber und Lizenz jeder Schrift: Stickschriften.txt (und im Auswahlfenster).
+  https://github.com/inkstitch/embroidery-fonts
+  Nur nicht-kommerziell nutzbar: Flowery Crosses, Flowery Crosses Multicolor, Handkerchief, Ladie's present, Magic Crosses, Nautical, Priscilla, Very crossy
+
+Garnkarten (Farbtabellen der Garnhersteller)
+  Aus den Paletten des Ink/Stitch-Projekts, GPL-3.0-or-later (GPL-3.0.txt).
+  https://github.com/inkstitch/inkstitch (Ordner palettes)
+  Garn- und Herstellernamen sind Marken ihrer Inhaber; sie dienen nur zur Zuordnung.
+
+Ideen und Arbeitsweisen vieler Stichfunktionen orientieren sich am Open-Source-Projekt
+Ink/Stitch (https://inkstitch.org) – vielen Dank an alle Beteiligten.

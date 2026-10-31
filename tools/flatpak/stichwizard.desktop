@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=StichWizard
+GenericName=Sticksoftware
+GenericName[en]=Embroidery Software
+Comment=Stickdesigns erstellen und für Stickmaschinen exportieren
+Comment[en]=Create embroidery designs and export them for embroidery machines
+Exec=stichwizard %f
+Icon=@APPID@
+Terminal=false
+Categories=Graphics;VectorGraphics;
+Keywords=Sticken;Stickmaschine;Embroidery;PES;DST;Stickschrift;
+MimeType=application/x-stickstudio-project;application/x-pes;application/x-dst;application/x-jef;application/x-exp;application/x-vp3;
+StartupNotify=true
+StartupWMClass=@APPID@

@@ -1,0 +1,60 @@
+3D-Puff-Beispiel: »TEAM« (erhaben) + »SEIT 2026« (flach) für eine Kappe
+=======================================================================
+
+Dateien
+-------
+TEAM-Puff-Kappe.stickproj        Projekt zum Weiterbearbeiten in StichWizard
+TEAM-Puff-Kappe.pes              für Brother / Babylock / Deco
+TEAM-Puff-Kappe.dst              für TEXI IRIS 10, Tajima & Co. (mit Stopp-Schritt)
+TEAM-Puff-Kappe-Arbeitsblatt.pdf Nadelplan, Nadel, Maße und 1:1-Schablone
+Ansicht-im-Rahmen.png            so liegt das Design im Kappenrahmen
+Vorschau-auf-Kappe.png           so wirkt es ungefähr auf der Kappe
+
+Daten
+-----
+Rahmen:   Kappenrahmen 130 × 60 mm
+Größe:    ca. 86 × 44 mm, ca. 3.000 Stiche, ca. 6 Minuten
+Garn 1:   Gold   – »SEIT 2026« (flach)
+Garn 2:   Weiß   – »TEAM« (3D-Puff)
+Material: Puffy-Schaumstoff 3 mm, weiß (passend zum Garn), Kappen-Abreißvlies
+
+Ablauf an der Maschine (TEXI IRIS 10 und andere Mehrnadel-Maschinen)
+--------------------------------------------------------------------
+Die DST-Datei hat 3 Schritte – so zeigt sie auch das Display der Maschine:
+  Schritt 1: Nadel 1 (Gold)  – »SEIT 2026«, ca. 1.300 Stiche
+  Schritt 2: STOPP-Schritt   – 0 Stiche: hier an der Maschine »Pause/Stopp« setzen
+                               (Nadel 2 zuordnen)
+  Schritt 3: Nadel 2 (Weiß)  – »TEAM« über dem Schaum, ca. 1.700 Stiche
+Ohne den Stopp würde die Maschine nach Gold sofort mit Weiß weitermachen –
+dann fehlt der Schaum!
+
+1. Gold auf Nadel 1, Weiß auf Nadel 2 einfädeln, Nadelfolge wie oben eingeben
+   und bei Schritt 2 die Pause/den Stopp aktivieren.
+2. Kappe mit Kappen-Abreißvlies in den Kappenrahmen spannen.
+   Nadel: DBxK5 80/12 (Titan, Rundspitze).
+3. Starten: »SEIT 2026« wird gestickt, dann hält die Maschine an.
+4. JETZT den Schaumstoff auflegen: ein Stück etwas größer als »TEAM«
+   (ca. 95 × 35 mm), ggf. an den Ecken mit Klebeband fixieren –
+   nicht über die Buchstaben kleben.
+5. Weiterstarten: die dichten Satinstiche drücken den Schaum rund, die
+   Querstiche an den Enden stanzen ihn sauber ab.
+6. Kappe aus dem Rahmen nehmen und den überstehenden Schaum vorsichtig von
+   außen nach innen abreißen.
+7. Kleine Schaumreste kurz mit Föhn/Heißluft anblasen – sie schrumpfen weg.
+
+Brother-Mehrnadel (PES): die PES-Datei enthält einen echten Stopp – die
+Maschine hält von selbst an.
+
+Hinweis Kappenrahmen: Das Design ist für einen 130 × 60 mm-Kappenrahmen
+angelegt. Hat dein Texi-Kappenrahmen ein anderes Stickfeld, lege ihn in
+StichWizard als eigenen Rahmen mit »Kappe« im Namen an (Rahmenliste ›
+Eigener Rahmen …) und prüfe, ob das Design (86 × 44 mm) hineinpasst.
+
+Tipps
+-----
+- Zuerst auf einem Stoffrest oder einer alten Kappe testen.
+- Wird »TEAM« zu flach: 3-mm-Schaum statt 2 mm nehmen.
+- Schaut Schaum zwischen den Stichen durch: Schaumfarbe = Garnfarbe wählen,
+  Geschwindigkeit der Maschine etwas reduzieren.
+- Text ändern: TEAM-Puff-Kappe.stickproj in StichWizard öffnen, Schriftzug
+  anklicken und den Text rechts in den Eigenschaften ändern (Puff bleibt).
