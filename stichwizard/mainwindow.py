@@ -183,6 +183,69 @@ class MainWindow(QMainWindow):
         self.resize(1440, 900)
         self.api_server = ApiServer(self, self._ai_activity)
         self.update_api_server()
+        self._update_checker = None
+        # Update-Hinweis: nicht in den Tests (offscreen) und nur, wenn eingeschaltet
+        if self.prefs.get("update_check") and os.environ.get("QT_QPA_PLATFORM") != "offscreen":
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(4000, lambda: self.check_updates(manual=False))
+
+    # ---------------------------------------------------------- Updates
+    def check_updates(self, manual=True):
+        """Bei GitHub nach einer neueren Version fragen. Lädt nichts herunter: neuere Version →
+        Hinweis in der Statusleiste (beim Start) bzw. Dialog mit Link (über das Menü)."""
+        from .update import UpdateChecker
+        if self._update_checker is not None:
+            return
+        self._update_checker = UpdateChecker(self)
+        self._update_checker.finished.connect(lambda res: self._update_result(res, manual))
+        self._update_checker.start()
+        if manual:
+            self.lbl_tip.setText("Suche nach Updates …")
+
+    def _update_result(self, res, manual):
+        from . import __version__
+        from .update import RELEASES_URL, is_newer
+        self._update_checker = None
+        if res and is_newer(res["version"]):
+            self._update_info = res
+            self.lbl_update.setText(f"<a href='#'>⬆ Version {res['version']} verfügbar</a>")
+            self.lbl_update.show()
+            if manual:
+                self.show_update()
+        elif manual:
+            self.lbl_tip.setText("")
+            if res:
+                QMessageBox.information(self, APP, f"StichWizard {__version__} ist aktuell.")
+            else:
+                QMessageBox.information(
+                    self, APP, "Es konnte nicht nach Updates gesucht werden (keine Internet-"
+                    f"verbindung oder noch keine veröffentlichte Version).<br><br>Releases: "
+                    f"<a href='{RELEASES_URL}'>{RELEASES_URL}</a>")
+
+    def show_update(self):
+        from . import __version__
+        res = getattr(self, "_update_info", None)
+        if not res:
+            return
+        box = QMessageBox(self)
+        box.setWindowTitle("Neue Version")
+        box.setTextFormat(Qt.RichText)
+        notes = res["notes"].strip()
+        if len(notes) > 600:
+            notes = notes[:600].rsplit("\n", 1)[0] + "\n…"
+        box.setText(f"<b>StichWizard {res['version']}</b> ist erschienen (installiert: "
+                    f"{__version__}).<br><br>Die neue Version wird nicht automatisch installiert. "
+                    "Lade sie herunter und installiere sie wie gewohnt.")
+        if notes:
+            box.setDetailedText(notes)
+        dl = box.addButton("Herunterladen …", QMessageBox.AcceptRole)
+        page = box.addButton("Release-Seite", QMessageBox.ActionRole)
+        box.addButton("Später", QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is dl:
+            QDesktopServices.openUrl(QUrl(res["url"]))
+        elif box.clickedButton() is page:
+            QDesktopServices.openUrl(QUrl(res["page"]))
 
     # ---------------------------------------------------------- KI / MCP
     def update_api_server(self):
@@ -534,6 +597,9 @@ class MainWindow(QMainWindow):
         self.a_manual = A("Anleitung\n(PDF)", "pdf", self.show_manual,
                           tip="Ausführliche Funktionsanleitung mit Bildern und Beispielen öffnen")
         self.a_about = A("Über\nStichWizard", "info", self.show_about)
+        self.a_update = A("Nach Updates\nsuchen", "import", self.check_updates,
+                          tip="Bei GitHub nachsehen, ob es eine neuere StichWizard-Version gibt "
+                              "(installiert nichts selbst)")
         self.a_mcp = A("KI-Anbindung\n(MCP)", "ai", self.show_mcp,
                        tip="KI-Assistenten wie Claude per MCP mit StichWizard verbinden")
         self.a_info = A("Design-\nInfo", "info", lambda: self.side.setCurrentWidget(self.seq))
@@ -897,7 +963,7 @@ class MainWindow(QMainWindow):
         r.addTab(self._page([
             self._group("Hilfe", [B(self.a_keys), B(self.a_guide), B(self.a_manual)]),
             self._group("KI", [B(self.a_mcp)]),
-            self._group("Programm", [B(self.a_settings), B(self.a_about)]),
+            self._group("Programm", [B(self.a_settings), B(self.a_update), B(self.a_about)]),
         ]), "Hilfe")
         r.setCurrentIndex(0)
         return r
@@ -1316,6 +1382,11 @@ class MainWindow(QMainWindow):
         self.lbl_ai = QLabel()
         self.lbl_ai.setToolTip("KI-Schnittstelle (MCP) – Einrichtung unter Hilfe › KI-Anbindung")
         sb.addPermanentWidget(self.lbl_ai)
+        self.lbl_update = QLabel()
+        self.lbl_update.setToolTip("Eine neuere StichWizard-Version ist erschienen – klicken für Details")
+        self.lbl_update.linkActivated.connect(lambda _: self.show_update())
+        self.lbl_update.hide()
+        sb.addPermanentWidget(self.lbl_update)
         self.lbl_machine = QLabel()
         self.lbl_machine.setToolTip("Gewählte Stickmaschine – ändern unter Export › Maschine")
         sb.addPermanentWidget(self.lbl_machine)
