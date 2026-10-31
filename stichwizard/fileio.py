@@ -86,8 +86,15 @@ def export_file(doc, path, optimize=False, progress=None):
     return stats
 
 
+# Längster Stich, den alle Exportformate und Maschinen sicher kennen: 12,1 mm (Tajima DST;
+# PES, JEF, EXP, VP3, XXX und U01 erlauben 12,7 mm). Kürzer darf die Grenze nicht sein, sonst
+# teilt pyembroidery breite Satinstiche (bis »split_len«, Standard 8 mm) beim Export ungefragt.
+MAX_STITCH_MM = 12.1
+
+
 def _write(pattern, path, ext):
-    settings = {"max_stitch": 70, "max_jump": 120} if ext not in ("svg",) else {}
+    settings = {"max_stitch": round(MAX_STITCH_MM * 10), "max_jump": 120} \
+        if ext not in ("svg",) else {}
     if ext == "pes":
         settings["version"] = "6"      # PES 6 speichert Garnname, Nummer und Hersteller
     pe.write(pattern, path, settings)
