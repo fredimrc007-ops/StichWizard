@@ -1,4 +1,5 @@
 """Hauptfenster von StichWizard."""
+import html
 import math
 import os
 import sys
@@ -40,11 +41,59 @@ class _Rect:
 PROJECT_EXT = "stickproj"
 
 
+def _one_line(label):
+    """Knopfbeschriftung über mehrere Zeilen (»Wieder-\nholen«) zu einer Zeile zusammensetzen."""
+    parts = [p.strip() for p in label.split("\n") if p.strip()]
+    out = parts[0] if parts else ""
+    for p in parts[1:]:
+        if out.endswith("-") and p[:1].islower():
+            out = out[:-1] + p            # Trennstrich: »Wieder-« + »holen«
+        elif out.endswith("-"):
+            out += p                      # »Säulen-« + »Satin«
+        else:
+            out += " " + p
+    return out
+
+
+def rich_tip(title, text=None, shortcut=None):
+    """Hinweis wie in Inkscape: fetter Name mit Tastenkürzel, darunter eine kurze Erklärung.
+    Als Rich-Text bricht Qt lange Erklärungen automatisch um."""
+    h = f"<b>{html.escape(_one_line(title))}</b>"
+    if shortcut:
+        keys = shortcut.replace("Ctrl", "Strg").replace("Shift", "Umschalt").replace("Del", "Entf")
+        h += f"&nbsp;&nbsp;({html.escape(keys)})"
+    if text:
+        h += f"<br>{html.escape(text)}"
+    return h
+
+
 def tool_icon(name):
     ic = QIcon()
     ic.addPixmap(icons.icon(name).pixmap(48), QIcon.Normal, QIcon.Off)
     ic.addPixmap(icons.icon(name, "#FFFFFF", "#FFFFFF").pixmap(48), QIcon.Normal, QIcon.On)
     return ic
+
+
+TOOL_TIPS = {
+    "select": "Objekte anklicken oder mit einem Rahmen aufziehen, dann verschieben, skalieren und "
+              "drehen (Alt+Klick wählt ein Objekt in einer Gruppe)",
+    "rect": "Rechteck aufziehen (Umschalt = Quadrat)",
+    "ellipse": "Ellipse aufziehen (Umschalt = Kreis)",
+    "polygon": "Fläche mit Ecken zeichnen: Punkt für Punkt klicken, Doppelklick schließt die Form",
+    "line": "Gerade Linie(n) zeichnen: Punkt für Punkt klicken, Doppelklick beendet",
+    "pen": "Klick = Ecke, Klicken und Ziehen = Kurve mit Anfassern, Klick auf den Start = "
+           "schließen, Enter = offene Linie",
+    "freehand": "Linie mit gedrückter Maustaste frei zeichnen",
+    "sketch": "Frei mit Stichen zeichnen wie mit einem Stift – Stil über den Pfeil am Knopf",
+    "text": "In den Rahmen klicken und einen Schriftzug setzen",
+    "nodes": "Punkte und Anfasser einer Form verschieben, einfügen und löschen",
+    "connect": "Zwei Endpunkte nacheinander anklicken – sie werden mit einer Linie verbunden",
+    "eraser": "Mit gedrückter Maustaste über Formen wischen und Teile wegradieren "
+              "([ / ] = Größe, Pfeil: Größe oder Lasso)",
+    "jumps": "Sprünge und Fadenschnitte direkt auf der Arbeitsfläche bearbeiten",
+    "measure": "Abstand und Winkel durch Ziehen messen (Umschalt = 45°-Schritte)",
+    "satin": "Satinsäule zeichnen: abwechselnd links und rechts der Säule klicken",
+}
 
 
 class RibbonButton(QToolButton):
@@ -297,27 +346,42 @@ class MainWindow(QMainWindow):
         if shortcut:
             a.setShortcut(QKeySequence(shortcut))
         a.setCheckable(checkable)
-        a.setToolTip(f"{tip or text}" + (f"  ({QKeySequence(shortcut).toString()})" if shortcut else ""))
+        if text:
+            a.setToolTip(rich_tip(text, tip, QKeySequence(shortcut).toString() if shortcut else None))
         self.addAction(a)
         return a
 
     def _make_actions(self):
         A = self._act
-        self.a_new = A("Neu", "new", self.new_doc, "Ctrl+N")
-        self.a_open = A("Öffnen", "open", self.open_doc, "Ctrl+O")
-        self.a_save = A("Speichern", "save", self.save_doc, "Ctrl+S")
-        self.a_saveas = A("Speichern\nunter", "save", self.save_doc_as, "Ctrl+Shift+S")
-        self.a_undo = A("Rückgängig", "undo", self.undo, "Ctrl+Z")
-        self.a_redo = A("Wieder-\nholen", "redo", self.redo, "Ctrl+Y")
+        self.a_new = A("Neu", "new", self.new_doc, "Ctrl+N",
+                tip="Neues, leeres Design anlegen")
+        self.a_open = A("Öffnen", "open", self.open_doc, "Ctrl+O",
+                tip="StichWizard-Projekt, Stickdatei, Vektorgrafik oder Bild öffnen")
+        self.a_save = A("Speichern", "save", self.save_doc, "Ctrl+S",
+                tip="Projekt speichern – alle Formen bleiben bearbeitbar")
+        self.a_saveas = A("Speichern\nunter", "save", self.save_doc_as, "Ctrl+Shift+S",
+                tip="Projekt unter neuem Namen oder an anderem Ort speichern")
+        self.a_undo = A("Rückgängig", "undo", self.undo, "Ctrl+Z",
+                tip="Letzten Arbeitsschritt zurücknehmen")
+        self.a_redo = A("Wieder-\nholen", "redo", self.redo, "Ctrl+Y",
+                tip="Zurückgenommenen Arbeitsschritt wiederherstellen (auch Strg+Umschalt+Z)")
         self.a_redo2 = A("", None, self.redo, "Ctrl+Shift+Z")
-        self.a_dup = A("Duplizieren", "duplicate", self.duplicate, "Ctrl+D")
-        self.a_del = A("Löschen", "delete", self.delete_selected, "Delete")
-        self.a_copy = A("Kopieren", None, self.copy, "Ctrl+C")
-        self.a_paste = A("Einfügen", None, self.paste, "Ctrl+V")
-        self.a_all = A("Alles auswählen", None, self.select_all, "Ctrl+A")
-        self.a_up = A("Früher\nsticken", "up", lambda: self.move_seq(-1), "Ctrl+Up")
-        self.a_down = A("Später\nsticken", "down", lambda: self.move_seq(1), "Ctrl+Down")
-        self.a_center = A("Zentrieren", "center", self.center_selected, "Ctrl+M")
+        self.a_dup = A("Duplizieren", "duplicate", self.duplicate, "Ctrl+D",
+                tip="Ausgewählte Objekte verdoppeln – die Kopie liegt leicht versetzt darüber")
+        self.a_del = A("Löschen", "delete", self.delete_selected, "Delete",
+                tip="Ausgewählte Objekte entfernen (im Punkte-Werkzeug: ausgewählte Punkte)")
+        self.a_copy = A("Kopieren", None, self.copy, "Ctrl+C",
+                tip="Ausgewählte Objekte in die Zwischenablage kopieren")
+        self.a_paste = A("Einfügen", None, self.paste, "Ctrl+V",
+                tip="Objekte aus der Zwischenablage einfügen")
+        self.a_all = A("Alles auswählen", None, self.select_all, "Ctrl+A",
+                tip="Alle Objekte im Design auswählen")
+        self.a_up = A("Früher\nsticken", "up", lambda: self.move_seq(-1), "Ctrl+Up",
+                tip="Ausgewählte Objekte in der Stickreihenfolge nach vorn rücken")
+        self.a_down = A("Später\nsticken", "down", lambda: self.move_seq(1), "Ctrl+Down",
+                tip="Ausgewählte Objekte in der Stickreihenfolge nach hinten rücken")
+        self.a_center = A("Zentrieren", "center", self.center_selected, "Ctrl+M",
+                tip="Auswahl (oder ganzes Design) in die Rahmenmitte setzen")
         # Gestalten wie in Inkscape
         self.a_intersect = A("Schnitt-\nmenge", "intersect", lambda: self.path_op("intersect"),
                              tip="Nur die Fläche behalten, die alle ausgewählten Formen gemeinsam "
@@ -434,7 +498,8 @@ class MainWindow(QMainWindow):
                       tip="Horizontal spiegeln (links ↔ rechts)")
         self.a_mv = A("Spiegeln\n↕", "mirror_v", lambda: self.mirror(False),
                       tip="Vertikal spiegeln (oben ↕ unten)")
-        self.a_import = A("Stickdatei\nimportieren", "import", self.import_design, "Ctrl+I")
+        self.a_import = A("Stickdatei\nimportieren", "import", self.import_design, "Ctrl+I",
+                tip="Fertige Stickdatei (PES, DST, JEF, EXP, VP3 …) in das aktuelle Design einfügen")
         self.a_vector = A("AI / PDF\nöffnen", "vector", self.import_vector, "Ctrl+Shift+I",
                           tip="Vektorgrafik aus Illustrator (.ai) oder PDF als bearbeitbare Formen "
                               "und Linien übernehmen – Farben, Kurven und Löcher bleiben erhalten")
@@ -443,18 +508,20 @@ class MainWindow(QMainWindow):
         self.a_photo = A("Fotostich", "photo", self.photo_stitch,
                          tip="Foto als Stickerei: farbig mit mehreren Garnen oder als einfarbige "
                              "Linienschraffur – mit Live-Vorschau")
-        self.a_digit = A("Bild-\nAssistent", "wand", self.digitize_image, "Ctrl+B")
+        self.a_digit = A("Bild-\nAssistent", "wand", self.digitize_image, "Ctrl+B",
+                tip="Bild (Logo, Clipart) automatisch in Stickflächen umwandeln – Schritt für Schritt mit Vorschau")
         self.a_trace = A("Bitmap\nnachzeichnen", "trace", self.trace_bitmap, "Ctrl+Alt+B",
                          tip="Bild genau in Pfade umwandeln wie in Inkscape: Helligkeitsschwelle, "
                              "Kanten, Mittellinie, Helligkeitsstufen, Farben oder Graustufen – mit "
                              "Feinreglern (Flecken, Ecken glätten, Toleranz) und Kontur-Vorschau")
         self.a_tpl = A("Vorlage\nladen", "image", self.load_template, "Ctrl+Shift+B",
                        tip="Bild als Vorlage zum Nachzeichnen in den Rahmen legen")
-        self.a_tpl_del = A("Vorlage\nentfernen", "delete", self.remove_template)
+        self.a_tpl_del = A("Vorlage\nentfernen", "delete", self.remove_template,
+                tip="Das Vorlagenbild zum Nachzeichnen wieder aus dem Rahmen nehmen")
         self.a_split = A("Zerlegen", "split", self.split_selected, "Ctrl+Shift+G",
                          tip="Form in einzelne Teile zerlegen (z. B. einzelne Buchstaben)")
         self.a_merge = A("Kombi-\nnieren", "merge", self.merge_selected, "Ctrl+G",
-                         tip="Ausgewählte Formen zu einer Form vereinen")
+                         tip="Ausgewählte Formen zu einer Form vereinen (Inkscape: Vereinigung)")
         self.a_convert = A("In Form\numwandeln", "convert", self.convert_to_shape,
                            tip="Schriftzug in eine bearbeitbare Form umwandeln")
         self.a_addnode = A("Punkt\neinfügen", "addnode", self.insert_nodes, "Ins",
@@ -475,7 +542,7 @@ class MainWindow(QMainWindow):
         self.a_auto = A("Rundungen\nerkennen", "autocurve", self.auto_curves,
                         tip="Eckige Konturen (z. B. digitalisiert) in wenige Ecken und Rundungen umwandeln")
         self.a_cut = A("Aus-\nschneiden", "cut", self.cut_selected,
-                       tip="Obere ausgewählte Form aus der unteren herausschneiden (Loch)")
+                       tip="Obere ausgewählte Form aus der unteren herausschneiden (Loch; Inkscape: Differenz)")
         self.a_tostitch = A("In Stiche\numwandeln", "stitchview", self.convert_to_stitches,
                             tip="Form/Schriftzug in feste Stiche umwandeln, um einzelne Sprünge "
                                 "und Stiche von Hand zu bearbeiten")
@@ -561,13 +628,17 @@ class MainWindow(QMainWindow):
                                "Digitalisieren) – sie ergeben nur Sprünge und Fadensalat")
         self.a_simplify = A("Punkte\nreduzieren", "simplify", self.simplify_selected,
                             tip="Weniger Punkte – macht das Bearbeiten übersichtlicher")
-        self.a_text = A("Schriftzug", "text", lambda: self.set_tool("text"))
-        self.a_export = A("Für Maschine\nexportieren", "export", self.export_design, "Ctrl+E")
-        self.a_png = A("Als Bild\nspeichern", "png", self.export_png)
+        self.a_text = A("Schriftzug", "text", lambda: self.set_tool("text"),
+                tip="Schriftzug mit Stick- oder Computerschrift setzen – in den Rahmen klicken")
+        self.a_export = A("Für Maschine\nexportieren", "export", self.export_design, "Ctrl+E",
+                tip="Design als Stickdatei für die Maschine speichern (PES, DST, JEF, EXP, VP3 …)")
+        self.a_png = A("Als Bild\nspeichern", "png", self.export_png,
+                tip="Realistische Ansicht des Designs als PNG-Bild speichern")
         self.a_sheet = A("Arbeitsblatt\n(PDF)", "sheet", self.export_worksheet, "Ctrl+P",
                          tip="Arbeitsblatt mit Vorschau, Farbfolge und 1:1-Schablone als PDF")
         # Simulator und Optimierer sind ein Fenster – F6 bleibt als zweites Tastenkürzel
-        self.a_optimizer = A("Simulator &\nOptimierer", "play", self.simulate, "F6")
+        self.a_optimizer = A("Simulator &\nOptimierer", "play", self.simulate, "F6",
+                tip="Sticksimulation: Reihenfolge, Sprünge und Fadenschnitte ansehen und optimieren")
         self.a_colorsort = A("Farben zusam-\nmenfassen", "colorsort", self.toggle_colorsort,
                              checkable=True,
                              tip="Gleiche Garnfarben nacheinander sticken (weniger Farbwechsel); "
@@ -579,35 +650,47 @@ class MainWindow(QMainWindow):
                        tip="Realistische Sticksimulation mit nummerierten Sprüngen – Reihenfolge, "
                            "Fadenschnitte und Verbindungen direkt bearbeiten, automatisch optimieren "
                            "(auch F6)")
-        self.a_zin = A("Vergrößern", "zoomin", lambda: self.canvas.zoom_by(1.25), "Ctrl++")
-        self.a_zout = A("Verkleinern", "zoomout", lambda: self.canvas.zoom_by(0.8), "Ctrl+-")
-        self.a_fit = A("Rahmen\neinpassen", "fit", self.fit_hoop, "Ctrl+0")
-        self.a_real = A("Realistisch", "realview", lambda: self.set_mode("real"), checkable=True)
+        self.a_zin = A("Vergrößern", "zoomin", lambda: self.canvas.zoom_by(1.25), "Ctrl++",
+                tip="Ansicht vergrößern (auch Strg + Mausrad)")
+        self.a_zout = A("Verkleinern", "zoomout", lambda: self.canvas.zoom_by(0.8), "Ctrl+-",
+                tip="Ansicht verkleinern (auch Strg + Mausrad)")
+        self.a_fit = A("Rahmen\neinpassen", "fit", self.fit_hoop, "Ctrl+0",
+                tip="Ansicht so zoomen, dass der ganze Stickrahmen sichtbar ist")
+        self.a_real = A("Realistisch", "realview", lambda: self.set_mode("real"), checkable=True,
+                tip="Design so zeigen, wie es gestickt aussieht")
         self.a_rulers = A("Lineal", "ruler", self.toggle_rulers, checkable=True,
                           tip="Lineale oben und links ein-/ausblenden (mm ab Rahmenmitte)")
-        self.a_stitch = A("Stich-\nansicht", "stitchview", lambda: self.set_mode("stitch"), checkable=True)
+        self.a_stitch = A("Stich-\nansicht", "stitchview", lambda: self.set_mode("stitch"), checkable=True,
+                tip="Einzelne Stiche als Linien zeigen – zum genauen Prüfen")
         g = QActionGroup(self)
         g.addAction(self.a_real)
         g.addAction(self.a_stitch)
         (self.a_stitch if self.opts.mode == "stitch" else self.a_real).setChecked(True)
-        self.a_jumps = A("Sprünge\nzeigen", "jumps", self.toggle_jumps, checkable=True)
-        self.a_grid = A("Raster", "grid", self.toggle_grid, checkable=True)
+        self.a_jumps = A("Sprünge\nzeigen", "jumps", self.toggle_jumps, checkable=True,
+                tip="Sprungstiche zwischen den Objekten als gestrichelte Linien ein-/ausblenden")
+        self.a_grid = A("Raster", "grid", self.toggle_grid, checkable=True,
+                tip="Raster im Rahmen ein-/ausblenden")
         self.a_grid.setChecked(self.opts.show_grid)
-        self.a_settings = A("Einstel-\nlungen", "gear", self.open_settings, "Ctrl+,")
+        self.a_settings = A("Einstel-\nlungen", "gear", self.open_settings, "Ctrl+,",
+                tip="Programm-Einstellungen: Maschine und Export, Ansicht, Werte für neue Objekte, Sprünge und Vernähen, Oberfläche")
         self.a_ui = A("Oberfläche\nanpassen", "layout", lambda: self.open_settings("Oberfläche"),
                       tip="Farbschema (hell/dunkel), Schriftgröße, Menüband, Lage von Werkzeugleiste "
                           "und Seitenleiste sowie einen eigenen Favoriten-Reiter einstellen")
-        self.a_keys = A("Tasten-\nkürzel", "keyboard", self.show_shortcuts, "F1")
-        self.a_guide = A("Kurz-\nanleitung", "help", self.show_guide)
+        self.a_keys = A("Tasten-\nkürzel", "keyboard", self.show_shortcuts, "F1",
+                tip="Übersicht aller Tastenkürzel anzeigen")
+        self.a_guide = A("Kurz-\nanleitung", "help", self.show_guide,
+                tip="Die wichtigsten Arbeitsschritte kurz erklärt")
         self.a_manual = A("Anleitung\n(PDF)", "pdf", self.show_manual,
                           tip="Ausführliche Funktionsanleitung mit Bildern und Beispielen öffnen")
-        self.a_about = A("Über\nStichWizard", "info", self.show_about)
+        self.a_about = A("Über\nStichWizard", "info", self.show_about,
+                tip="Programmversion und verwendete Open-Source-Bausteine mit Lizenzen")
         self.a_update = A("Nach Updates\nsuchen", "import", self.check_updates,
                           tip="Bei GitHub nachsehen, ob es eine neuere StichWizard-Version gibt "
                               "(installiert nichts selbst)")
         self.a_mcp = A("KI-Anbindung\n(MCP)", "ai", self.show_mcp,
                        tip="KI-Assistenten wie Claude per MCP mit StichWizard verbinden")
-        self.a_info = A("Design-\nInfo", "info", lambda: self.side.setCurrentWidget(self.seq))
+        self.a_info = A("Design-\nInfo", "info", lambda: self.side.setCurrentWidget(self.seq),
+                tip="Stichzahl, Größe, Farben und Stickreihenfolge des Designs in der Seitenleiste anzeigen")
         # Pfeiltasten & Entf nur auf der Arbeitsfläche
         for key, dx, dy in (("Left", -1, 0), ("Right", 1, 0), ("Up", 0, -1), ("Down", 0, 1)):
             for mod, f in (("", 1), ("Shift+", 10)):
@@ -646,7 +729,8 @@ class MainWindow(QMainWindow):
             a.setProperty("tool_icon", ic)
             a.setCheckable(True)
             a.setShortcut(QKeySequence(sc))
-            a.setToolTip(f"{label}  ({sc})")
+            name, _, rest = label.partition(": ") if ": " in label else label.partition(" (")
+            a.setToolTip(rich_tip(name, TOOL_TIPS.get(key, rest.rstrip(")") or None), sc))
             a.triggered.connect(lambda _=False, k=key: self.set_tool(k))
             self.tool_group.addAction(a)
             self.tool_actions[key] = a
@@ -750,8 +834,6 @@ class MainWindow(QMainWindow):
         r.setObjectName("ribbon")
         r.setFixedHeight(138)
         B = self._rbtn
-        self.a_merge.setToolTip("Formen zu einer verbinden (Inkscape: Vereinigung)  (Strg+G)")
-        self.a_cut.setToolTip("Obere Form aus der unteren herausschneiden (Inkscape: Differenz)")
         # Hoop / Stoff
         self.hoop_combo = QComboBox()
         self.hoop_combo.setToolTip("Stickrahmen – ganz unten »Eigener Rahmen …« für eine "
@@ -811,6 +893,8 @@ class MainWindow(QMainWindow):
         for name, _ in MOTIFS:
             mm.addAction(name, lambda n=name: self.add_motif(n))
         motif_btn.setMenu(mm)
+        motif_btn.setToolTip(rich_tip("Motive", "Fertige Form (Herz, Stern, Blatt …) in den "
+                                                 "Rahmen einfügen"))
         shape_btns.append(motif_btn)
         for b in shape_btns[:3]:
             b.defaultAction().setIconText(b.defaultAction().text().split(" (")[0].split(" /")[0])
@@ -834,7 +918,9 @@ class MainWindow(QMainWindow):
         r.addTab(self._page([
             self._group("Text", [B(self.tool_actions["text"]), B(self.a_textpath),
                                  B(self.a_detach),
-                                 self._menu_btn("Hüllform", "envelope", self.envelope_menu()),
+                                 self._menu_btn("Hüllform", "envelope", self.envelope_menu(),
+                                               "Schriftzug in eine Form biegen: Bogen, Welle, "
+                                               "Wimpel, Raute …"),
                                  B(self.a_shadow), B(self.a_wordsculpt)]),
             self._group("Umwandeln", [B(self.a_convert), B(self.a_centerline)]),
             self._group("Eigene Schriften", [B(self.a_fontshop)]),
@@ -918,9 +1004,13 @@ class MainWindow(QMainWindow):
             self._group("Gruppe", [B(self.a_group), B(self.a_ungroup)]),
             self._group("Pfad-Operationen", [B(self.a_merge), B(self.a_cut), B(self.a_intersect),
                                              B(self.a_exclude), B(self.a_divide), B(self.a_split)]),
-            self._group("Ausrichten", [self._menu_btn("Ausrichten", "align", self.align_menu()),
+            self._group("Ausrichten", [self._menu_btn("Ausrichten", "align", self.align_menu(),
+                                                      "Ausgewählte Objekte bündig ausrichten – an "
+                                                      "der Auswahl oder am Stickrahmen"),
                                        self._menu_btn("Verteilen", "distribute",
-                                                      self.distribute_menu()),
+                                                      self.distribute_menu(),
+                                                      "Ausgewählte Objekte waagerecht oder "
+                                                      "senkrecht mit gleichen Abständen verteilen"),
                                        B(self.a_center), B(self.a_mh), B(self.a_mv)]),
             self._group("Ebenen", [B(self.a_layers), B(self.a_newlayer), B(self.a_lock),
                                    B(self.a_unlock)]),
@@ -986,8 +1076,8 @@ class MainWindow(QMainWindow):
         b.setIconSize(QSize(28, 28))
         b.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         b.setPopupMode(QToolButton.InstantPopup)
-        b.setToolTip("Stickmaschine wählen: stellt Rahmen, Exportformat, Tempo, Stopps und "
-                     "Nadelempfehlung passend ein")
+        b.setToolTip(rich_tip("Stickmaschine", "Maschine wählen: stellt Rahmen, Exportformat, "
+                                               "Tempo, Stopps und Nadelempfehlung passend ein"))
         m = QMenu(b)
         m.aboutToShow.connect(lambda: self._fill_machine_menu(m))
         b.setMenu(m)
@@ -1185,8 +1275,10 @@ class MainWindow(QMainWindow):
         b.setMenu(self.sketch_menu())
         return b
 
-    def _menu_btn(self, text, icon_name, menu):
+    def _menu_btn(self, text, icon_name, menu, tip=None):
         b = QToolButton()
+        if tip:
+            b.setToolTip(rich_tip(text, tip))
         b.setObjectName("ribbonBtn")
         b.setText(text)
         b.setIcon(icons.icon(icon_name))
@@ -1330,7 +1422,8 @@ class MainWindow(QMainWindow):
             a.triggered.connect(lambda _=False, v=mm: self._set_grid_step(v))
             grp.addAction(a)
         b.setMenu(m)
-        b.setToolTip("Raster ein/aus · Pfeil: Einrasten ein/aus, Einrast-Ziele, Rasterweite")
+        b.setToolTip(rich_tip("Raster", "Raster ein/aus · Pfeil: Einrasten ein/aus, Einrast-Ziele, "
+                                         "Rasterweite"))
         self.grid_btn = b
         self._apply_snap_prefs()
         return b
@@ -1361,7 +1454,7 @@ class MainWindow(QMainWindow):
             a.setChecked(self.prefs.get("ui_accent") == key)
             g2.addAction(a)
         b.setMenu(m)
-        b.setToolTip("Farbschema: hell oder dunkel, dazu eine Akzentfarbe")
+        b.setToolTip(rich_tip("Farbschema", "Hell oder dunkel, dazu eine Akzentfarbe"))
         self.theme_menu = m
         return b
 
