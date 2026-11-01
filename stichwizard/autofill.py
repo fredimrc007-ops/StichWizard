@@ -24,6 +24,8 @@ SPLIT_COST = 14.0    # Rest zerfällt in getrennte Gruppen -> später Randweg/Sp
 DEADEND_COST = 5.0   # Abschnitt endet ohne offenen Nachbarn
 TRIM_COST = 15.0     # zusätzlich, wenn der Sprung geschnitten werden muss
 TRIM_DISTANCE = 5.0
+EDGE_MAX = 40.0      # mm – so lange Randwege sind besser als ein Sprung
+CRUMB = 2.0          # mm – kürzere Reststücke einer Füllung werden nicht eigens angesprungen
 
 
 def _d(a, b):
@@ -378,6 +380,17 @@ def island_runs(poly, spacing, length, offsets, pos, row_points, scan_rows, chai
                            within=poly.bounds, prefer=later, penalty=8.0)
             if route is not None and _LS(route).difference(later.buffer(0.3)).length <= 2.0:
                 how, path = "edge", route
+        if how == "jump" and edge is not None and last is not None and cur:
+            # sonst am Rand entlang (knapp innen, dort deckt ein Rand bzw. der Randabschluss
+            # der Füllung den Weg) – auch auf längerem Weg lieber als Sprung mit Fadenschnitt
+            start = secs[k].entries[ei][1]
+            el = edge.length(last, start)
+            if el is not None and el <= max(EDGE_MAX, _d(last, start) * 5):
+                how, path = "edge", edge.path(last, start)
+        if how == "jump" and cur and len(secs) > 1 and \
+                sum(_d(p, q) for p, q in zip(pts, pts[1:])) < CRUMB:
+            done.add(k)                # Krümel (1–2 kurze Reihenstücke): weglassen statt springen
+            continue
         done.add(k)
         if how in ("start", "jump"):
             if cur:

@@ -299,7 +299,7 @@ def _units(e, P, cfg):
         if len(fwd) < 2:
             return []
         return [{"fwd": [fwd], "rev": [rev] if len(rev) >= 2 else None,
-                 "foot": satin.outline(a, b), "satin": True}]
+                 "foot": satin.outline(a, b), "satin": True, "center": _center_line(a, b)}]
     runs = _el_stitches(e, P, cfg)
     if t == "fill":
         runs = [r for r in runs if len(r) >= 2]
@@ -313,6 +313,48 @@ def _units(e, P, cfg):
             out.append({"fwd": [r], "rev": [r[::-1]], "foot": LineString(r).buffer(w / 2 + 0.2),
                         "satin": t == "zigzag"})
     return out
+
+
+def _center_line(a, b, n=24):
+    """Mittellinie einer Satinsäule (zwischen den Schienen a und b)."""
+    if len(a) < 2 or len(b) < 2:
+        return None
+    la, lb = LineString(a), LineString(b)
+    pts = []
+    for k in range(n + 1):
+        p = la.interpolate(k / n, normalized=True)
+        q = lb.interpolate(k / n, normalized=True)
+        pts.append(((p.x + q.x) / 2, (p.y + q.y) / 2))
+    return pts
+
+
+def _split_route(units, pos, target):
+    """Wie Auto-Satin: Satinsäulen in »hin« (Steppstich auf der Mittellinie, verschwindet unter
+    dem Satin) und »zurück« (Satin) teilen – dazwischen werden angrenzende Säulen gestickt,
+    die Wege laufen unter noch offenen Säulen. Erspart Sprünge innerhalb eines Buchstabens."""
+    from . import textsatin
+    if len(units) < 2 or any(len(u["fwd"]) != 1 or u["foot"] is None or u["foot"].is_empty
+                             for u in units):
+        return None
+    parts, feet, atomic = [], [], set()
+    for k, u in enumerate(units):
+        fwd = u["fwd"][0]
+        rev = u["rev"][0] if u["rev"] else None
+        c = u.get("center")
+        if u["satin"] and rev is not None and c and \
+                u["foot"].buffer(0.1).covers(LineString(c)) and \
+                engine.dist(c[0], fwd[0]) < engine.dist(c[-1], fwd[0]):
+            down = engine.resample(c, 2.0)
+            parts.append(((down, rev), (down[::-1], fwd)))
+        else:
+            atomic.add(k)
+            back = rev or fwd
+            parts.append(((fwd, [fwd[-1]]), (back, [back[-1]])))
+        feet.append(u["foot"])
+    inner = unary_union(feet).buffer(0.05)
+    score, runs = textsatin.plan_parts(parts, feet, [], pos, target, inner,
+                                       atomic=frozenset(atomic), trials=3)
+    return runs, runs[-1][-1] if runs else pos
 
 
 def _route_units(units, pos, target=None, fixed=False):
@@ -401,9 +443,10 @@ def _score(runs, pos, target):
     return cost
 
 
-def _best_route(units, pos, target):
-    """Original, Originalreihenfolge mit besten Richtungen oder frei optimiert – je nachdem,
-    was am wenigsten springt (gut digitalisierte Schriften bleiben so, wie sie sind)."""
+def _best_route(units, pos, target, split=True):
+    """Original, Originalreihenfolge mit besten Richtungen, frei optimiert oder mit geteilten
+    Satinsäulen (Auto-Satin) – je nachdem, was am wenigsten springt (gut digitalisierte
+    Schriften bleiben so, wie sie sind)."""
     raw = [r for u in units for r in u["fwd"]]
     options = [(raw, raw[-1][-1] if raw else pos)]
     for fixed in (True, False):
@@ -411,7 +454,24 @@ def _best_route(units, pos, target):
             options.append(_route_units(units, pos, target, fixed))
         except Exception:
             pass
-    return min(options, key=lambda o: _score(o[0], pos, target))
+    best = min(options, key=lambda o: _score(o[0], pos, target))
+    if split and _score(best[0], pos, target) >= 10:      # es bleibt mindestens ein Sprung
+        try:
+            alt = _split_route(units, pos, target)
+            if alt is not None and _jumps(alt[0], pos) < _jumps(best[0], pos):
+                best = alt
+        except Exception:
+            pass
+    return best
+
+
+def _jumps(runs, pos):
+    n, last = 0, pos
+    for r in runs:
+        if last is not None and engine.dist(last, r[0]) > engine.DIRECT_TRAVEL:
+            n += 1
+        last = r[-1]
+    return n
 
 
 def _center(placed, xfs, font, outline, letters, envelope):

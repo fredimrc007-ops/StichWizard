@@ -119,8 +119,34 @@ check(f"Stickdatei: Sprungwege {sum(jumps(mixed)):.0f} → {L:.0f} mm bei {st['j
 head = blue[:next(k for k, p in enumerate(blue) if p[2] == STITCH)]
 check("Kein zusätzlicher Fadenschnitt beim Farbwechsel", not any(p[2] == TRIM for p in head))
 
+# ---- Buchstaben wie Auto-Satin: Unterlage hinein, Satin zurück, Wege unter späteren Strichen
+from stichwizard.model import EmbObject
+from stichwizard.optimize import split_runs
+from stichwizard import templates
+def letter_jumps(o):
+    """(Sprünge, Mindestzahl = Buchstaben-Teile − 1)."""
+    (_, sts), = o.stitch_blocks()
+    parts = len([p for p in engine.polygons_of(o.shaped_geometry()) if p.area > 0.5])
+    return len(split_runs(sts)) - 1, parts - 1
+t = EmbObject("text", "Serif")
+t.text.update(text="HAFNEREI", font="DejaVu Serif", size=8, bold=True, embfont="", auto_satin=True)
+t.fill.update(type="tatami")
+j, lo = letter_jumps(t)
+check(f"Computerschrift mit Serifen: {j} Sprünge bei {lo + 1} Buchstaben (vorher 28)", j <= lo + 1)
+sts = t.stitch_blocks()[0][1]
+g = t.shaped_geometry().buffer(0.4)
+from shapely.geometry import LineString
+outside = sum(LineString([a[:2], b[:2]]).difference(g).length for a, b in zip(sts, sts[1:])
+              if a[2] == STITCH and b[2] == STITCH)
+check(f"Verbindungswege bleiben im Buchstaben ({outside:.2f} mm außerhalb)", outside < 0.5)
+e = templates.text("TEAM SEIT", 10, "#1565C0", font="geneva_simple")
+(_, sts), = e.stitch_blocks()
+check(f"Stickschrift: {len(split_runs(sts)) - 1} Sprünge bei 8 Buchstaben (vorher 19)",
+      len(split_runs(sts)) - 1 <= 8)
+
 # ---- Hilfe
 check("Hilfe erklärt die geplante Reihenfolge", "ganzer Weg" in shelp.GUIDE)
+check("Hilfe erklärt den Auto-Satin in Buchstaben", "mit dem Satin zurück" in shelp.GUIDE)
 
 # ---- echtes Projekt (nur lesend), falls vorhanden: »Des« → »is« → »Passt!«
 real = os.path.join(STICK_DIR, "Stickdateien", "Des is Passt-Kappe 1.0.stickproj")

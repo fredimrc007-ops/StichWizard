@@ -430,7 +430,12 @@ noch kommen. Sprünge bleiben nur zwischen getrennten Teilen (z. B. einzelnen Bu
 Die Reihenfolge dieser Teile – und gleichfarbiger Objekte – wird als ganzer Weg geplant (ab 1.23):
 nicht einfach immer zum nächstgelegenen Teil, sondern so, dass alle Sprünge zusammen am kürzesten
 sind. So bleibt kein einzelnes Teil liegen, zu dem am Ende quer über das Motiv zurückgesprungen
-wird – mehrzeilige Schriftzüge werden z. B. Zeile für Zeile gestickt.</li>
+wird – mehrzeilige Schriftzüge werden z. B. Zeile für Zeile gestickt.
+Innerhalb eines Buchstabens (Computer- und Stickschriften) geht es wie beim Auto-Satin in
+Profi-Programmen: in jeden Strich mit der Unterlage hinein, mit dem Satin zurück – die Wege
+dazwischen verschwinden unter Strichen, die noch kommen. Ein zusammenhängender Buchstabe wird so
+ohne Sprung gestickt. In Füllungen werden winzige Reststücke nicht eigens angesprungen, und
+längere Wege laufen lieber am Rand entlang, als zu springen.</li>
 <li><b>Unterlage zuerst für alle Teile</b> (Eigenschaften › Füllstich): erst die Unterlage aller
 Teile einer Form, danach der Füllstich – stabilisiert große oder mehrteilige Flächen besser,
 kostet aber ein paar Sprünge mehr. Innerhalb einer zusammenhängenden Fläche kommt die
