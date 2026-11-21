@@ -436,6 +436,16 @@ Profi-Programmen: in jeden Strich mit der Unterlage hinein, mit dem Satin zurüc
 dazwischen verschwinden unter Strichen, die noch kommen. Ein zusammenhängender Buchstabe wird so
 ohne Sprung gestickt. In Füllungen werden winzige Reststücke nicht eigens angesprungen, und
 längere Wege laufen lieber am Rand entlang, als zu springen.</li>
+<li><b>Ein- und Ausstieg automatisch</b> (Simulator &amp; Optimierer › Reihenfolge, wie »Closest
+Join« in Wilcom/Hatch): Jedes Objekt beginnt dort, wo das vorige aufgehört hat, und endet in
+Richtung des nächsten gleichfarbigen Objekts – der Deckstich läuft dafür verdeckt zur Gegenseite
+und stickt von dort zum Ausstieg hin. Stickschriften werden rückwärts gestickt, wenn die Nadel vom
+Textende kommt. Berühren sich gleichfarbige Objekte, läuft die Verbindung als Steppstich unter dem
+nächsten Objekt (kurze Wege auch über das eben gestickte) – kein Sprung, kein Fadenschnitt.
+Eigene Start-/Endpunkte gehen immer vor.</li>
+<li><b>Kappe: von der Mitte nach außen</b> (bei Stoffart »Kappe«, abschaltbar im Optimierer):
+Objekte und Buchstaben werden von der Mitte nach außen und jedes Teil von unten nach oben
+gestickt, damit sich der Stoff auf der gewölbten Kappe nicht zur Seite schiebt.</li>
 <li><b>Unterlage zuerst für alle Teile</b> (Eigenschaften › Füllstich): erst die Unterlage aller
 Teile einer Form, danach der Füllstich – stabilisiert große oder mehrteilige Flächen besser,
 kostet aber ein paar Sprünge mehr. Innerhalb einer zusammenhängenden Fläche kommt die

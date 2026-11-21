@@ -72,9 +72,9 @@ w.doc.order_mode = "auto"; w.sync_items([]); w.commit()
 names = {o.id: n for o, n in zip(w.doc.objects, ("links", "rechts", "mitte"))}
 seq = lambda: [names[i] for i, _, _ in jumps.stitch_order(w.doc)]
 auto_seq = seq()
-# als ganzer Weg geplant: in einer Richtung durch (die Füllungen enden unten links -> von rechts
-# nach links ist hier am kürzesten), Mitte nie zuerst
-check(f"Automatisch kürzester Weg: {auto_seq}", auto_seq == ["rechts", "mitte", "links"])
+# als ganzer Weg geplant: in einer Richtung durch, Mitte nie zuerst (mit automatischem
+# Ein-/Ausstieg zählen die Abstände der Formen; bei Gleichstand beginnt es links)
+check(f"Automatisch kürzester Weg: {auto_seq}", auto_seq == ["links", "mitte", "rechts"])
 d = OptimizerDialog(w, "Stick-Simulation"); d.show(); QTest.qWait(50)
 between = [r for r in d.records if r["kind"] == "between" and not r["same"]]
 first = between[0]
@@ -82,7 +82,7 @@ d.select_record(first["index"])
 check("Umdrehen zwischen Objekten gesperrt", not d.btn_reverse.isEnabled())
 d.edit_order("later"); QTest.qWait(10)
 check(f"Objekt später sticken → {seq()}, Modus »von Hand«",
-      seq() == ["rechts", "links", "mitte"] and w.doc.order_mode == "manual" and not d.auto_order.isChecked())
+      seq() == [auto_seq[0], auto_seq[2], auto_seq[1]] and w.doc.order_mode == "manual" and not d.auto_order.isChecked())
 d.auto_order.setChecked(True); QTest.qWait(10)
 check(f"Wieder automatisch → {seq()}", seq() == auto_seq and w.doc.order_mode == "auto")
 d.accept()

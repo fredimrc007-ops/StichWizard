@@ -1077,8 +1077,19 @@ def _auto_fill(geom, fill, kind, angle, spacing, length, size, pull, keep=None, 
         runs = []
         if underlay and not first:
             runs, pos = _underlay_runs(isl, geom.intersection(isl) if pull else isl, angle, pos, fill)
-        runs += _jitter_runs(fill_stitches(isl, angle, spacing, start=pos, keep=keep, end=goal,
-                                           **args), fill)
+        top = fill_stitches(isl, angle, spacing, start=pos, keep=keep, end=goal, **args)
+        if runs and goal is not None and kind != "guided" and top and \
+                dist(top[-1][-1], goal) > DIRECT_TRAVEL:
+            # Deckstich soll am Ausstieg enden: verdeckt (unter dem noch kommenden Deckstich)
+            # zur gegenüberliegenden Seite laufen und von dort zum Ausstieg hin sticken –
+            # nur, wenn er dann wirklich näher am Ausstieg endet
+            hop = _cover_start(isl, pos, goal, angle)
+            if hop:
+                alt = fill_stitches(isl, angle, spacing, start=hop[-1], keep=keep, end=goal, **args)
+                if alt and dist(alt[-1][-1], goal) < dist(top[-1][-1], goal) - 1.0:
+                    runs.append(hop)
+                    top = alt
+        runs += _jitter_runs(top, fill)
         for run in runs:
             connect(out, run)
         if out:
@@ -1086,6 +1097,37 @@ def _auto_fill(geom, fill, kind, angle, spacing, length, size, pull, keep=None, 
         if final and end is not None and out and dist(pos, end) > DIRECT_TRAVEL:
             _travel_to(out, end, isl)
     return out
+
+
+def _cover_start(isl, pos, goal, angle):
+    """Verdeckter Weg von `pos` (Ende der Unterlage) zu der Seite der Insel, die dem Ausstieg
+    `goal` gegenüberliegt – quer zu den Reihen gemessen. Die Reihen laufen von dort zum Ausstieg
+    (wie Wilcom/Hatch mit »Closest Join«). None, wenn die Nadel schon richtig steht."""
+    from .optimize import _route, _travel_points
+    nx, ny = -math.sin(math.radians(angle)), math.cos(math.radians(angle))
+    proj = lambda p: p[0] * nx + p[1] * ny
+    ring = [c[:2] for c in isl.exterior.coords]
+    lo, hi = min(map(proj, ring)), max(map(proj, ring))
+    if hi - lo < 6.0:
+        return None
+    g = proj(goal)
+    far = lo if hi - g < g - lo else hi                 # gegenüberliegende Seite
+    if abs(proj(pos) - far) < (hi - lo) * 0.3:
+        return None
+    # Startpunkt: nahe der gegenüberliegenden Seite, möglichst gerade gegenüber vom Ausstieg
+    inner = isl.buffer(-0.4)
+    if inner.is_empty:
+        return None
+    band = [c for c in ring if abs(proj(c) - far) < (hi - lo) * 0.12]
+    tx, ty = ny, -nx
+    side = lambda p: p[0] * tx + p[1] * ty
+    target = min(band, key=lambda c: abs(side(c) - side(goal)))
+    target = nearest_points(inner, Point(target))[0].coords[0]
+    path = _route(tuple(pos[:2]), target, inner.buffer(0.05), detour=(1.6, 6.0),
+                  within=isl.bounds)
+    if path is None:
+        return None
+    return [tuple(pos[:2])] + _travel_points(path)
 
 
 def _travel_to(out, end, area):
@@ -1348,7 +1390,15 @@ def element_fill(geom, fill, border, cut=None):
     parts = [p for p in polygons_of(geom) if p.area > 0.05]
     out = []
     pos = tuple(fill["start"][:2]) if fill.get("start") else None
-    plan = _planned(parts, pos)
+    goal = fill.get("end") or fill.get("_target")
+    last = None
+    if goal is not None and len(parts) > 1:       # Element am Ausstieg zuletzt
+        G = Point(goal[:2])
+        k = min(range(len(parts)), key=lambda i: parts[i].distance(G))
+        if pos is None or len(parts) > 2 or \
+                k != min(range(len(parts)), key=lambda i: parts[i].distance(Point(pos))):
+            last = parts.pop(k)
+    plan = _planned(parts, pos, last)
     for k, isl in enumerate(plan):
         f = dict(fill)
         f.pop("end", None)
@@ -1358,6 +1408,8 @@ def element_fill(geom, fill, border, cut=None):
             f["_target"] = nearest_points(isl, plan[k + 1])[1].coords[0]
         elif fill.get("end"):
             f["_target"] = tuple(fill["end"][:2])
+        elif fill.get("_target") is not None:
+            f["_target"] = tuple(fill["_target"][:2])
         area = isl if cut is None else knock_out(isl, cut)
         sts = fill_with_underlay(area, f) if not area.is_empty else []
         _append(out, sts)

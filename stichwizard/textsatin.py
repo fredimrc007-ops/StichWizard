@@ -122,12 +122,23 @@ def lettering_stitches(geom, fill, cap=None):
     Teile und Knotenpunkte als Tatami. Liefert eine Stichliste (wie fill_with_underlay)."""
     spacing = max(0.25, fill.get("density", 0.4))
     polys = sorted((p for p in polygons_of(geom) if p.area > 0.05), key=lambda p: p.bounds[0])
+    if fill.get("_center") and len(polys) > 2:
+        # Kappe: von der Mitte nach rechts, dann von der Mitte nach links (gegen Verzug)
+        m = len(polys) // 2
+        polys = polys[m:] + polys[:m][::-1]
     out = []
     tat = dict(fill, type="tatami")
+    for k in ("start", "end", "_target", "_center"):     # gelten für den ganzen Schriftzug, nicht je Teil
+        tat.pop(k, None)
     for pi, poly in enumerate(polys):
         width = 2 * poly.area / max(poly.length, 1e-6)
+        pos = (out[-1][0], out[-1][1]) if out else \
+            (tuple(fill["start"][:2]) if fill.get("start") else None)
+        nxt = polys[pi + 1] if pi + 1 < len(polys) else None
+        target = nearest_points(poly, nxt)[1].coords[0] if nxt is not None else \
+            (tuple(fill["_target"][:2]) if fill.get("_target") is not None else None)
         if width > MAX_SATIN * 0.9 or (cap and width > cap * 0.45):
-            _append(out, engine.fill_with_underlay(poly, tat))
+            _append(out, engine.fill_with_underlay(poly, dict(tat, start=pos, _target=target)))
             continue
         cols = _columns(poly, spacing, width)
         inner = poly.buffer(0.1)
@@ -141,9 +152,6 @@ def lettering_stitches(geom, fill, cap=None):
                 runs = _runs_of(engine.fill_with_underlay(piece, dict(tat, underlay=False)))
                 if runs:
                     pieces.append((piece, runs))
-        pos = (out[-1][0], out[-1][1]) if out else None
-        nxt = polys[pi + 1] if pi + 1 < len(polys) else None
-        target = nearest_points(poly, nxt)[1].coords[0] if nxt is not None else None
         refill = (lambda pc, a, b: _runs_of(engine.fill_with_underlay(
             pc, dict(tat, underlay=False, start=a, end=b))))
         seq = _letter_route(cols, quads, pieces, pos, target, fill, width, inner, refill)

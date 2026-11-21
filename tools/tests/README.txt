@@ -10,6 +10,7 @@ GUI-Regressionstests (laufen ohne sichtbares Fenster, mit eigenen Einstellungen)
       trace_gui.py (Bitmap nachzeichnen: Modi, Feinregler, Vorlage deckungsgleich),
       vector_gui.py (AI/PDF öffnen: erzeugt sich seine Testdatei selbst),
       jumporder_gui.py (Sprünge logisch verteilt: geplante Reihenfolge, tour.py),
+      joins_gui.py (Ein-/Ausstieg automatisch, Verbindung unter dem nächsten Objekt, Kappe),
       verzieren_gui.py (1.24: Encore, Rahmen & Schnörkel, Strass samt Schablone SVG/PDF),
       muster_gui.py (1.25: Spirograph, Text in Form / Word Sculpt),
       ith_gui.py (1.26: Projekt im Rahmen, Stopps, PDF-Anleitung),

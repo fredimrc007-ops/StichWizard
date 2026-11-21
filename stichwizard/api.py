@@ -439,6 +439,10 @@ class DesignAPI:
         if p.get("color_sort") is not None:
             self.w.a_colorsort.setChecked(bool(p["color_sort"]))
             self.w.toggle_colorsort()
+        for flag in ("auto_join", "cap_center"):
+            if p.get(flag) is not None:
+                setattr(self.doc, flag, bool(p[flag]))
+                self.w.commit()
         if p.get("knockout_margin") is not None:
             try:
                 margin = float(p["knockout_margin"])
@@ -453,7 +457,8 @@ class DesignAPI:
         return {"hoop": HOOPS[self.doc.hoop][0], "fabric": self.doc.fabric,
                 "fabric_type": self.doc.fabric_type, "knockout": self.doc.knockout,
                 "knockout_margin": self.doc.knockout_margin,
-                "color_sort": self.doc.color_sort, "thread_chart": threads.CURRENT_CHART}
+                "color_sort": self.doc.color_sort, "auto_join": self.doc.auto_join,
+                "cap_center": self.doc.cap_center, "thread_chart": threads.CURRENT_CHART}
 
     @staticmethod
     def _check_fabric_type(key):

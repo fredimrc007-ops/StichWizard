@@ -261,6 +261,7 @@ class ObjectItem(QGraphicsItem):
         self.blocks = []
         xs, ys = [], []
         self._knock = getattr(self.obj, "_knock_key", None)   # gezeichnete Aussparung
+        self._join = getattr(self.obj, "_join", None)         # gezeichneter Ein-/Ausstieg
         for color, sts in self.obj.stitch_blocks():
             lines, jumps = stitch_lines(sts)
             self.blocks.append((color, lines, jumps))

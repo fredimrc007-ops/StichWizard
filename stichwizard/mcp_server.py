@@ -122,6 +122,12 @@ TOOLS = [
                         "description": "Stoffart: passt Dichte, Zugausgleich und Unterlage an "
                                        "(towel = Frottee, jersey = T-Shirt, cap = Kappe …)"},
         "color_sort": {"type": "boolean", "description": "Gleiche Farben nacheinander sticken"},
+        "auto_join": {"type": "boolean", "description": "Ein-/Ausstieg je Objekt automatisch zum "
+                                                        "vorigen bzw. nächsten Objekt hin (kürzere "
+                                                        "Sprünge, Verbindungen unter dem nächsten "
+                                                        "Objekt)"},
+        "cap_center": {"type": "boolean", "description": "Stoffart Kappe: von der Mitte nach außen "
+                                                         "und von unten nach oben sticken"},
         "knockout": {"type": "boolean", "description": "Automatisch aussparen: was später gestickte "
                                                        "Objekte verdecken, wird darunter nicht gestickt "
                                                        "(Formen bleiben unverändert, wandert beim "
