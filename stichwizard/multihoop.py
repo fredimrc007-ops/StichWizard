@@ -195,6 +195,7 @@ def split(doc, hoop_index, hoop_w, hoop_h, overlap=10.0, marks=True):
         d.hoop = hoop_index
         d.fabric, d.fabric_type = doc.fabric, doc.fabric_type
         d.color_sort, d.order_mode = doc.color_sort, doc.order_mode
+        d.auto_join, d.cap_center = doc.auto_join, doc.cap_center
         d.layers = [dict(L) for L in doc.layers]
         d.active_layer = doc.active_layer
         for o in p["objs"]:

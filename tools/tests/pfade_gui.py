@@ -178,7 +178,7 @@ f0 = world_sts(sa)[0]
 select(sa); w.a_startpt.trigger(); QTest.mouseClick(vp, Qt.LeftButton, Qt.NoModifier, v(20, 42.5))
 f1, l1 = world_sts(sa)[0], world_sts(sa)[-1]
 check(f"Satinsäule beginnt rechts (vorher x={f0[0]:.0f}, jetzt x={f1[0]:.0f}, Ende x={l1[0]:.0f})",
-      f0[0] < 0 < f1[0] and l1[0] < 0)
+      0 < f1[0] and l1[0] < 0)     # vorher: je nach automatischem Einstieg (Closest Join)
 select(sa); w.a_endpt.trigger(); QTest.mouseClick(vp, Qt.LeftButton, Qt.NoModifier, v(20, 42.5))
 l2 = world_sts(sa)[-1]
 check(f"Start und Ende rechts: Unterlage hin, Satin zurück (Ende x={l2[0]:.0f})", l2[0] > 15)

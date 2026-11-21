@@ -541,13 +541,14 @@ def _glyph_mappers(placed, xfs, font, letters, envelope):
 @functools.lru_cache(maxsize=64)
 def render(fid, text, size, letter_spacing=0.0, arc=0.0, density=0.0, pull=0.0,
            underlay=True, color=None, path=None, path_align="center", path_flip=False,
-           envelope=None, letters=()):
+           envelope=None, letters=(), reverse=False):
     """Text in Stickschrift -> (blöcke [(farbe, stiche)], umriss) zentriert im Ursprung.
     path: Tupel von Punkten (mm) – Text entlang dieses Pfads, dann ohne Zentrieren.
     size: Höhe der Großbuchstaben in mm. Farbe None = Objektfarbe (einfarbige Schriften);
     mehrfarbige Schriften behalten ihre Originalfarben. Ergebnis ist zwischengespeichert –
     nicht verändern. envelope: (art, stärke) Hüllform; letters: ((index, dx, dy, drehung,
-    größe%), …) einzeln verschobene Buchstaben."""
+    größe%), …) einzeln verschobene Buchstaben. reverse: Buchstaben von hinten nach vorn sticken
+    (jeder Buchstabe selbst bleibt, wie er ist) – wenn die Nadel vom Textende her kommt."""
     font = load(fid)
     s = size / font["size"]
     if path:
@@ -568,6 +569,19 @@ def render(fid, text, size, letter_spacing=0.0, arc=0.0, density=0.0, pull=0.0,
             else:
                 groups.append((col, units, name, xf))
             shapes.append(_el_shape(e, P))
+    if reverse:
+        chunks = []
+        for g in groups:
+            if chunks and chunks[-1][-1][3] is g[3]:
+                chunks[-1].append(g)
+            else:
+                chunks.append([g])
+        if reverse == "center":     # Kappe: von der Mitte nach rechts, dann von der Mitte nach links
+            m = len(chunks) // 2
+            chunks = chunks[m:] + chunks[:m][::-1]
+        else:
+            chunks = chunks[::-1]
+        groups = [g for ch in chunks for g in ch]
     # gleichfarbige Elemente eines Buchstabens: Reihenfolge und Richtung optimieren
     runs, pos = [], None
     for gi, (col, units, _, _) in enumerate(groups):

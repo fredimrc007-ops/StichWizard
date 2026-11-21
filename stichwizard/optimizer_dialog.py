@@ -326,6 +326,23 @@ class OptimizerDialog(QDialog):
         self.auto_order.setChecked(window.doc.order_mode == "auto")
         self.auto_order.toggled.connect(self.set_auto_order)
         sv.addWidget(self.auto_order)
+        self.auto_join = QCheckBox("Ein- und Ausstieg automatisch zum Nachbarn hin")
+        self.auto_join.setToolTip("An: Jedes Objekt beginnt dort, wo das vorige aufgehört hat, und endet "
+                                  "in Richtung des nächsten (wie »Closest Join« in Wilcom/Hatch).\n"
+                                  "Berühren sich gleichfarbige Objekte, läuft die Verbindung als "
+                                  "Steppstich unter dem nächsten Objekt statt als Sprung.\n"
+                                  "Eigene Start-/Endpunkte gehen immer vor")
+        self.auto_join.setChecked(window.doc.auto_join)
+        self.auto_join.toggled.connect(lambda on: self.set_flag("auto_join", on))
+        sv.addWidget(self.auto_join)
+        self.cap_center = QCheckBox("Kappe: von der Mitte nach außen, von unten nach oben")
+        self.cap_center.setToolTip("Nur bei Stoffart »Kappe«: Objekte und Buchstaben von der Mitte "
+                                   "nach außen und jedes Teil von unten nach oben sticken – so "
+                                   "schiebt sich der Stoff auf der gewölbten Kappe nicht zur Seite.\n"
+                                   "Kostet etwas längere Sprünge")
+        self.cap_center.setChecked(window.doc.cap_center)
+        self.cap_center.toggled.connect(lambda on: self.set_flag("cap_center", on))
+        sv.addWidget(self.cap_center)
 
         t3 = QLabel("Alle auf einmal")
         t3.setObjectName("cardTitle")
@@ -636,6 +653,11 @@ class OptimizerDialog(QDialog):
         if hit is not None:
             self.select_record(hit["index"])
         self.sel_label.setText(msg)
+
+    def set_flag(self, name, on):
+        setattr(self.w.doc, name, bool(on))
+        self.w.commit()
+        self.refresh()
 
     def set_auto_order(self, on):
         self.w.doc.order_mode = "auto" if on else "manual"

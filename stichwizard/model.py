@@ -107,6 +107,9 @@ class EmbObject:
         self._gkey = self._geom = None
         self._skey = self._stitches = None
         self._knock = self._knock_key = None   # automatisches Aussparen (Document.update_knockouts)
+        # automatischer Ein-/Ausstieg (Document.machine_blocks): {"fill"|"border": (ein, aus)}
+        # im Objektrahmen – nur wo kein eigener Start-/Endpunkt gesetzt ist
+        self._join = None
         # Profi-Automatiken für neu erstellte Objekte (alte Projekte behalten ihre Werte)
         self.fill.update(auto_spacing=True, underlay_auto=True)
         self.border["auto_spacing"] = True
@@ -296,7 +299,7 @@ class EmbObject:
                                       len(self.cross["back"]), self.cross.get("passes", 1),
                                       engine.TIE_MODE])
         return json.dumps(base + [self.fill, self.border, self._gkey_source(), engine.FABRIC,
-                                  self._knock_key], sort_keys=True)
+                                  self._knock_key, self._join], sort_keys=True)
 
     def _gkey_source(self):
         if self.kind == "shape":
@@ -307,7 +310,7 @@ class EmbObject:
             return [self.curve]
         return [self.points, self.ptypes, self.closed, self.smooth]
 
-    def _emb_render(self, size, path_scale=(1.0, 1.0)):
+    def _emb_render(self, size, path_scale=(1.0, 1.0), reverse=False):
         from . import embfont
         t = self.text
         if not embfont.exists(t["embfont"]):
@@ -322,7 +325,35 @@ class EmbObject:
                               t.get("arc", 0.0), t.get("emb_density", 0.0), t.get("emb_pull", 0.0),
                               bool(self.fill.get("underlay", True)), None, path,
                               t.get("path_align", "center"), bool(t.get("path_flip", False)),
-                              *self._text_fx())
+                              *self._text_fx(), reverse=reverse)
+
+    def _emb_choose(self, size, path_scale, xf):
+        """Stickschrift: Buchstaben vorwärts oder rückwärts – je nachdem, was mit dem automatischen
+        Ein-/Ausstieg (self._join) kürzere Wege ergibt, ohne zusätzliche Sprünge im Text.
+        Auf Kappen von der Mitte nach außen (wie »Center out« in Profi-Programmen)."""
+        if (self._join or {}).get("center") and len((self.text.get("text") or "").strip()) > 2:
+            return self._emb_render(size, path_scale, reverse="center")
+        fwd = self._emb_render(size, path_scale)
+        je, jx = self._joined("fill")
+        if je is None and jx is None or len(fwd[0]) != 1:
+            return fwd
+        rev = self._emb_render(size, path_scale, reverse=True)
+        if len(rev[0]) != 1:
+            return fwd
+
+        def score(blocks):
+            sts = [xf(x, y) for x, y, f in blocks[0][1] if f == STITCH]
+            if not sts:
+                return 1e18
+            # ein Sprung mit Fadenschnitt kostet viel, ein kurzer ohne Schnitt kaum
+            c = sum((40.0 if g[4] else 5.0) + engine.dist(g[2], g[3])
+                    for g in scan_gaps(blocks[0][1]))
+            if je is not None:
+                c += engine.dist(je, sts[0])
+            if jx is not None:
+                c += engine.dist(sts[-1], jx)
+            return c
+        return rev if score(rev[0]) < score(fwd[0]) - 1.0 else fwd
 
     def _text_fx(self):
         """(hüllform, buchstaben) als hashbare Argumente für embfont.render/letter_centers."""
@@ -384,14 +415,16 @@ class EmbObject:
         if self.kind == "text" and self.text.get("embfont"):
             # in echter Größe neu berechnen (Dichte bleibt richtig), Verzerrung/Drehung danach
             ay = abs(self.sy) or 1.0
+            c, s = math.cos(math.radians(self.rot)), math.sin(math.radians(self.rot))
             if self.text.get("path"):
                 # Text am Pfad: Pfad mitskalieren, Buchstaben unverzerrt in echter Höhe
-                blocks, _ = self._emb_render(self.text["size"] * ay, (self.sx, self.sy))
                 fx = fy = 1.0
+                scale = (self.sx, self.sy)
             else:
-                blocks, _ = self._emb_render(self.text["size"] * ay)
                 fx, fy = self.sx / ay, (1 if self.sy >= 0 else -1)
-            c, s = math.cos(math.radians(self.rot)), math.sin(math.radians(self.rot))
+                scale = (1.0, 1.0)
+            xf = lambda x, y: ((x * fx) * c - (y * fy) * s, (x * fx) * s + (y * fy) * c)
+            blocks, _ = self._emb_choose(self.text["size"] * ay, scale, xf)
             out = []
             for col, sts in blocks:
                 pts = [((x * fx) * c - (y * fy) * s, (x * fx) * s + (y * fy) * c, f) for x, y, f in sts]
@@ -421,9 +454,10 @@ class EmbObject:
                 ul = ul and st == "zigzag"
             f = self.fill
             # Start-/Endpunkt: Säule passend herum bzw. mit Rückweg (Unterlage hin, Satin zurück)
+            je, jx = self._joined("fill")
             ra, rb, back = satin.orient_column(
-                ra, rb, self.shaped_point(f["start"]) if f.get("start") else None,
-                self.shaped_point(f["end"]) if f.get("end") else None)
+                ra, rb, self.shaped_point(f["start"]) if f.get("start") else je,
+                self.shaped_point(f["end"]) if f.get("end") else jx)
             cw, co, zz = satin.underlay_flags(f.get("satin_ul", "auto"), width, st) if ul else \
                 (False, False, False)
             pts = satin.satin_stitches(ra, rb, rungs,
@@ -482,6 +516,12 @@ class EmbObject:
             f["guide"] = self.shaped_points(f.get("guide"))
             f["start"] = self.shaped_point(f["start"]) if f.get("start") else None
             f["end"] = self.shaped_point(f["end"]) if f.get("end") else None
+            je, jx = self._joined("fill")
+            f["_center"] = bool((self._join or {}).get("center"))
+            if f["start"] is None and je is not None:
+                f["start"] = je            # automatischer Einstieg: nah am vorigen Objekt
+            if f["end"] is None and jx is not None:
+                f["_target"] = jx          # zum nächsten Objekt hin enden (ohne Weg dorthin)
             if self.border["type"] != "none" and \
                     self.border["color"].upper() == self.fill["color"].upper():
                 # Rand in Füllfarbe: Element für Element (Teilfläche + ihr Rand, dann weiter)
@@ -503,11 +543,25 @@ class EmbObject:
             prev = next((s for _, b in reversed(res) for s in reversed(b) if s[2] == STITCH), None)
             if prev is None and self.kind in ("shape", "text") and self.fill.get("start"):
                 prev = self.shaped_point(self.fill["start"])
+            je, jx = self._joined("border")
+            own = bool(self.kind in ("shape", "text") and self.fill.get("start"))
+            auto = je is not None and not (own and not res)
+            if auto:
+                prev = je                  # automatischer Einstieg nach dem vorigen Block
             sts = engine.border_stitches(geom, self.border, start=prev[:2] if prev else None,
-                                         exact=bool(self.fill.get("start") or self.fill.get("end")))
+                                         exact=auto or bool(self.fill.get("start") or
+                                                            self.fill.get("end")),
+                                         end=jx)
             if sts:
                 res.append((("border",), engine.finish(sts)))
         return res
+
+    def _joined(self, role):
+        """Automatischer Ein-/Ausstieg des Blocks (»fill« oder »border«) im Objektrahmen."""
+        j = (self._join or {}).get(role)
+        if not j:
+            return None, None
+        return (tuple(j[0]) if j[0] else None), (tuple(j[1]) if j[1] else None)
 
     def _knocked(self, geom):
         """Füllfläche ohne die von später gestickten Objekten verdeckten Bereiche
@@ -617,6 +671,187 @@ def autosatin_link(groups, a_obj, b_obj, a, b):
     return _travel_points(path) if path else None
 
 
+JOIN_GRID = 0.5      # mm – Ein-/Ausstiegspunkte auf dieses Raster runden (stabile Zwischenspeicher)
+JOIN_KEEP = 1.0      # mm – so wenig verschobene Punkte behalten den alten Wert
+
+
+def joinable(o):
+    """Kann das Objekt seinen Ein-/Ausstieg selbst wählen? Berechnete Formen, Schriftzüge,
+    Satinsäulen und Linien – nicht Stickdateien, Applikationen und mehrfarbige Füllungen."""
+    if o.kind in ("satin", "line"):
+        return True
+    if o.kind == "shape":
+        return o.fill.get("type") not in ("applique", "gradient", "tartan")
+    if o.kind == "text":
+        # Stickschrift: nur die Buchstabenfolge (vorwärts/rückwärts) wird gewählt
+        return bool(o.text.get("embfont")) or o.fill.get("type") not in ("applique", "gradient",
+                                                                          "tartan")
+    return False
+
+
+def _join_geom(o):
+    """Form des Objekts (Welt) für die Wahl von Ein- und Ausstieg."""
+    g = getattr(o, "_jgeom", None)
+    key = (o._gkey, o.x, o.y, o.sx, o.sy, o.rot)
+    if g is None or g[0] != key:
+        try:
+            geom = o.world_geometry()
+        except Exception:
+            geom = None
+        if geom is not None and geom.is_empty:
+            geom = None
+        g = o._jgeom = (key, geom)
+    return g[1]
+
+
+def _snap(o, p, old):
+    """Weltpunkt -> Objektrahmen, gerundet; nahe am alten Wert bleibt der alte (kein Neuberechnen
+    wegen Kleinigkeiten)."""
+    if p is None:
+        return None
+    q = (round((p[0] - o.x) / JOIN_GRID) * JOIN_GRID, round((p[1] - o.y) / JOIN_GRID) * JOIN_GRID)
+    if old is not None and math.hypot(q[0] - old[0], q[1] - old[1]) <= JOIN_KEEP:
+        return tuple(old)
+    return q
+
+
+def plan_joins(items, anchor=None):
+    """Automatischer Ein-/Ausstieg wie »Closest Join« in Wilcom/Hatch: Jeder Block beginnt an der
+    Stelle seines Objekts, die dem Ende des vorigen Blocks am nächsten liegt, und endet in
+    Richtung des nächsten Objekts. Eigene Start-/Endpunkte gehen vor (siehe _compute_stitches).
+    anchor (Kappe): jedes Objekt beginnt an der Stelle, die unten in der Mitte des Designs am
+    nächsten liegt, und wird von dort nach außen bzw. oben gestickt.
+    Setzt o._join; liefert die Objekte, deren Werte sich geändert haben."""
+    from shapely.geometry import Point
+    from shapely.ops import nearest_points
+    want = {}
+    pos = pcol = None
+    for k, (o, bi, color, sts) in enumerate(items):
+        planned = None      # geplanter Ausstieg dieses Blocks (Welt)
+        if pcol is None or pcol.upper() != color.upper():
+            pos = None      # nach dem Farbwechsel ist die Anfahrt ohnehin ein Sprung
+        role = None
+        if joinable(o) and o._stitches and bi < len(o._stitches):
+            role = o._stitches[bi][0][0]
+        if role in ("fill", "border"):
+            geom = _join_geom(o)
+            if role == "border" and geom is not None and geom.geom_type in ("Polygon",
+                                                                            "MultiPolygon"):
+                geom = geom.boundary        # der Rand liegt auf der Kontur, nicht in der Fläche
+            entry = exit_ = None
+            if geom is not None and anchor is not None:
+                entry = nearest_points(geom, Point(anchor))[0].coords[0]
+            elif geom is not None:
+                if pos is not None:
+                    entry = nearest_points(geom, Point(pos))[0].coords[0]
+                nxt = items[k + 1][0] if k + 1 < len(items) else None
+                if nxt is not None and items[k + 1][2].upper() != color.upper():
+                    nxt = None          # danach Farbwechsel: wo der Block endet, ist egal
+                if nxt is not None and nxt is not o:
+                    ng = _join_geom(nxt)
+                    if ng is not None:
+                        exit_ = nearest_points(geom, ng)[0].coords[0]
+                if entry is None and role == "border":
+                    entry = exit_       # geschlossener Rand: dort beginnen, wo er enden soll
+            old = ((o._join or {}).get(role) or (None, None))
+            J = want.setdefault(id(o), (o, {}))[1]
+            J[role] = (_snap(o, entry, old[0]), _snap(o, exit_, old[1]))
+            if o.kind == "shape":   # Formen enden (fast) am geplanten Punkt, Schrift/Säulen
+                planned = exit_     # an einem ihrer Enden – dort zählt der echte letzte Stich
+            if anchor is not None and o.kind == "text":
+                J["center"] = True      # Schrift auf der Kappe von der Mitte nach außen
+        # Der nächste Einstieg richtet sich nach dem geplanten Ausstieg (nur von den Formen
+        # abhängig – so ändert sich nichts mehr, wenn neu gerechnet wurde), sonst nach dem
+        # tatsächlich letzten Stich
+        last = next((s for s in reversed(sts) if s[2] == STITCH), None)
+        if planned is not None:
+            pos, pcol = planned, color
+        elif last is not None:
+            pos, pcol = last[:2], color
+    changed = []
+    for o, J in want.values():
+        J = {r: v for r, v in J.items() if v != (None, None)} or None
+        if J != o._join:
+            o._join = J
+            changed.append(o)
+    return changed
+
+
+TRAVEL_ON_TOP = 8.0   # mm – so kurze Wege dürfen auch über das eben gestickte, gleichfarbige
+                      # Objekt laufen (wie »Travel on edge«), längere nur unter dem nächsten
+
+
+_AREAS = {}
+
+
+def _stitched_area(sts, near):
+    """Fläche, die die Stiche bedecken (nur der Teil um `near`, Welt) – zwischengespeichert."""
+    key = (len(sts), tuple(sts[0][:2]), tuple(sts[-1][:2]), tuple(sts[len(sts) // 2][:2]),
+           near.bounds)
+    if key in _AREAS:
+        return _AREAS[key]
+    if len(_AREAS) > 400:
+        _AREAS.clear()
+    g = _AREAS[key] = _stitched_area_raw(sts, near)
+    return g
+
+
+def _stitched_area_raw(sts, near):
+    from shapely.ops import unary_union
+    runs, run = [], []
+    for x, y, f in sts:
+        if f == STITCH:
+            run.append((x, y))
+        elif run:
+            runs.append(run)
+            run = []
+    if run:
+        runs.append(run)
+    parts = [LineString(r).buffer(0.3, quad_segs=2) for r in runs if len(r) > 1]
+    parts = [p for p in parts if p.intersects(near)]
+    if not parts:
+        return None
+    g = unary_union(parts).buffer(-0.1)
+    return None if g.is_empty else g
+
+
+def travel_link(o, sts, a, b, prev=None):
+    """Weg von a (Ende des vorigen Objekts) zum Einstieg b von Objekt o in gleicher Farbe als
+    Steppstich statt Sprung und Fadenschnitt – wie »Travel under« in Profi-Programmen: ganz
+    unter den Stichen von o, die danach kommen. Geht das nicht und ist der Weg kurz, darf er auch
+    über die gleichfarbigen Stiche des vorigen Objekts laufen (prev). None = springen."""
+    key = (len(sts), tuple(sts[0][:2]), tuple(sts[-1][:2]), tuple(a[:2]), tuple(b[:2]),
+           (len(prev), tuple(prev[-1][:2])) if prev else None)
+    if key in _LINKS:
+        return _LINKS[key]
+    if len(_LINKS) > 400:
+        _LINKS.clear()
+    path = _LINKS[key] = _travel_link(sts, a, b, prev)
+    return path
+
+
+_LINKS = {}
+
+
+def _travel_link(sts, a, b, prev):
+    from shapely.geometry import Point
+    from .optimize import _route, _travel_points
+    d = engine.dist(a, b)
+    if d > 25.0:
+        return None
+    near = LineString([a, b]).buffer(6 + d)
+    cover = _stitched_area(sts, near)
+    path = None
+    if cover is not None and cover.distance(Point(a[:2])) <= 0.6:
+        path = _route(tuple(a[:2]), tuple(b[:2]), cover, detour=(1.8, 4.0))
+    if path is None and prev and d <= TRAVEL_ON_TOP:
+        before = _stitched_area(prev, near)
+        if before is not None and cover is not None:
+            path = _route(tuple(a[:2]), tuple(b[:2]), before.union(cover), detour=(1.5, 2.0),
+                          prefer=cover, penalty=3.0)
+    return _travel_points(path)[:-1] if path else None
+
+
 def scan_gaps(sts):
     """Sprünge innerhalb einer Stichliste: (gap_start, gap_ende, a, b, mit_schnitt).
     gap_start = erster Nicht-Stich nach einem Stich, gap_ende = Index des nächsten Stichs."""
@@ -704,6 +939,8 @@ class Document:
         self.optimize = False     # Sprünge in Formen beim Sticken/Export optimieren
         self.color_sort = True    # Farbblöcke zusammenfassen (weniger Farbwechsel)
         self.order_mode = "auto"  # Reihenfolge gleicher Farben: auto (kürzeste Wege) | manual
+        self.auto_join = True     # Ein-/Ausstieg je Objekt automatisch zum Nachbarn hin (Closest Join)
+        self.cap_center = True    # Kappe: von der Mitte nach außen, von unten nach oben sticken
         # Automatisch aussparen: was später gestickte Objekte verdecken, wird darunter nicht
         # gestickt – nur beim Berechnen der Stiche, die Formen selbst bleiben unverändert
         self.knockout = False
@@ -758,6 +995,7 @@ class Document:
              "hoop_size": list(self.hoop_size), "fabric": self.fabric,
              "fabric_type": self.fabric_type,
              "color_sort": self.color_sort, "order_mode": self.order_mode,
+             "auto_join": self.auto_join, "cap_center": self.cap_center,
              "knockout": self.knockout, "knockout_margin": self.knockout_margin,
              "layers": self.layers, "active_layer": self.active_layer,
              "objects": [o.to_dict() for o in self.objects]}
@@ -781,6 +1019,8 @@ class Document:
             if d.get("fabric_type") in engine.FABRIC_PROFILES else "standard"
         self.color_sort = bool(d.get("color_sort", True))
         self.order_mode = d.get("order_mode", "auto") if d.get("order_mode") in ("auto", "manual") else "auto"
+        self.auto_join = bool(d.get("auto_join", True))
+        self.cap_center = bool(d.get("cap_center", True))
         self.knockout = bool(d.get("knockout", False))
         try:
             self.knockout_margin = min(5.0, max(0.0, float(d.get("knockout_margin", 1.0))))
@@ -803,6 +1043,7 @@ class Document:
                 if prev.kind != "stitches":
                     o._skey, o._stitches = prev._skey, prev._stitches
                     o._knock, o._knock_key = prev._knock, prev._knock_key
+                    o._join = prev._join
                 o._cov = getattr(prev, "_cov", None)
             objs.append(o)
         self.objects = objs
@@ -872,15 +1113,19 @@ class Document:
         if optimize is None:
             optimize = self.optimize
         self.update_knockouts()
-        items = [(o, bi, color, sts) for o in self.objects if o.visible and self.layer_shown(o)
-                 for bi, (color, sts) in enumerate(o.world_blocks(optimize))
-                 if any(s[2] == STITCH for s in sts)]
-        if self.color_sort:
-            from .colororder import sort_blocks
-            items = sort_blocks(items, shortest=self.order_mode == "auto")
+        items = self._items(optimize)
+        from .colororder import sort_blocks
+        if self.color_sort and self.fabric_type != "cap":
+            items = sort_blocks(items, shortest=self.order_mode == "auto",
+                                geometric=self.auto_join)
+        anchor = self._cap_anchor()
+        if self.color_sort and anchor is not None:
+            items = sort_blocks(items, shortest=self.order_mode == "auto", anchor=anchor)
+        if self.auto_join:
+            items = self._joined_items(items, optimize, anchor)
         self.last_order = [(o.id, bi, color) for o, bi, color, _ in items]   # für den Reihenfolge-Editor
         merged = []
-        prev_obj = None
+        prev_obj = prev_sts = None
         groups = autosatin_groups(items)
         for o, bi, color, sts in items:
             first = next(k for k, s in enumerate(sts) if s[2] == STITCH)
@@ -893,7 +1138,12 @@ class Document:
                 trim = mode in ("always", "stop") or (mode == "auto" and d > engine.TRIM_DISTANCE)
                 link = autosatin_link(groups, prev_obj, o, last, b) if mode == "auto" and \
                     d > engine.DIRECT_TRAVEL else None
-                if link:                    # Auto-Satin: verdeckter Steppstich statt Sprung
+                if link is None and self.auto_join and mode == "auto" and prev_obj is not o:
+                    if d <= engine.DIRECT_TRAVEL:
+                        link = []            # so kurz: direkt weitersticken (kein Sprung)
+                    else:
+                        link = travel_link(o, sts[first:], last[:2], b[:2], prev_sts)
+                if link is not None:        # Auto-Satin: verdeckter Steppstich statt Sprung
                     cur.extend((x, y, STITCH) for x, y in link)
                     trim = False
                     sts = sts[first:]
@@ -925,10 +1175,39 @@ class Document:
                                     "gs": g[0], "ge": g[1], "a": g[2], "b": g[3],
                                     "trim": g[4], "mblock": len(merged) - 1,
                                     "mpos": base + g[0]})
-            prev_obj = o
+            prev_obj, prev_sts = o, sts
         if records is None and engine.MIN_STITCH > 0:
             merged = [(c, _drop_short(sts, engine.MIN_STITCH)) for c, sts in merged]
         return merged
+
+    def _items(self, optimize):
+        return [(o, bi, color, sts) for o in self.objects if o.visible and self.layer_shown(o)
+                for bi, (color, sts) in enumerate(o.world_blocks(optimize))
+                if any(s[2] == STITCH for s in sts)]
+
+    def _cap_anchor(self):
+        """Stoffart Kappe: Punkt unten in der Mitte des Designs (Welt), sonst None."""
+        if self.fabric_type != "cap" or not self.cap_center:
+            return None
+        boxes = [g.bounds for o in self.objects if o.visible and self.layer_shown(o)
+                 for g in [_join_geom(o)] if g is not None]
+        if not boxes:
+            return None
+        return ((min(b[0] for b in boxes) + max(b[2] for b in boxes)) / 2,
+                max(b[3] for b in boxes))
+
+    def _joined_items(self, items, optimize, anchor=None):
+        """Ein-/Ausstiege planen (plan_joins), neu berechnen und – da sich dabei die Wege ändern –
+        neu ordnen, bis Reihenfolge und Punkte zusammenpassen (höchstens drei Durchgänge)."""
+        from .colororder import sort_blocks
+        for _ in range(3):
+            if not plan_joins(items, anchor):
+                break
+            items = self._items(optimize)
+            if self.color_sort:
+                items = sort_blocks(items, shortest=self.order_mode == "auto", anchor=anchor,
+                                    geometric=True)
+        return items
 
     def stats(self):
         blocks = self.machine_blocks()

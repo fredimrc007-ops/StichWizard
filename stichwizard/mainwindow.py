@@ -1395,6 +1395,16 @@ class MainWindow(QMainWindow):
             QApplication.restoreOverrideCursor()
         self.canvas.viewport().update()
 
+    def _sync_joins(self):
+        """Nach dem Planen der Ein-/Ausstiege (machine_blocks) die Objekte neu zeichnen, deren
+        Stiche sich dadurch geändert haben – Ansicht und Maschine zeigen dasselbe."""
+        todo = [it for it in self.items.values()
+                if getattr(it, "_join", None) != getattr(it.obj, "_join", None)]
+        for it in todo:
+            it.rebuild()
+        if todo:
+            self.canvas.viewport().update()
+
     def _grid_btn(self):
         """Raster-Knopf: Klick = Raster ein/aus, Pfeil = Einrasten und Rasterweite."""
         b = self._rbtn(self.a_grid)
@@ -1872,6 +1882,7 @@ class MainWindow(QMainWindow):
         self.seq.populate(self.doc.objects, sel)
         self._refresh_layers()
         st = self.doc.stats()
+        self._sync_joins()
         w, h = self.doc.hoop_size
         hrs = int(st["minutes"] // 60)
         mins = int(round(st["minutes"] % 60))
